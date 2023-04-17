@@ -21,7 +21,7 @@
 
     <groupId>uk.co.amrc.factoryplus</groupId>
     <artifactId>hivemq-auth-krb</artifactId>
-    <version>0.1.5</version>
+    <version>0.1.6</version>
 
     <description>Factory+ HiveMQ Kerberos extension</description>
 
