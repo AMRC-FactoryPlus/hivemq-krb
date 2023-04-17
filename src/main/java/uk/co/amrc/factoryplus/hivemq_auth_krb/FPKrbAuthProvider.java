@@ -13,6 +13,8 @@ import java.util.concurrent.Callable;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import java.security.PrivilegedExceptionAction;
+import java.security.PrivilegedActionException;
 import javax.security.auth.Subject;
 import javax.security.auth.callback.*;
 import javax.security.auth.login.*;
@@ -22,6 +24,8 @@ import org.slf4j.LoggerFactory;
 
 import org.ietf.jgss.*;
 import org.json.*;
+
+import uk.co.amrc.factoryplus.*;
 
 import com.hivemq.extension.sdk.api.annotations.NotNull;
 import com.hivemq.extension.sdk.api.annotations.Nullable;
@@ -43,55 +47,29 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
     private Oid krb5PrincipalNT;
 
     private FPServiceClient service_client;
+
+    private GSSManager gss_manager;
     private Configuration jaas_config;
     private Subject krb_subject;
 
-    private String server_principal;
-    private GSSManager gss_manager;
-    private GSSCredential server_cred;
+    private FPGss gss;
+    private FPGssServer gss_server;
 
     public FPKrbAuthProvider ()
     {
-        server_principal = safe_getenv("SERVER_PRINCIPAL");
-
+        String princ = safe_getenv("SERVER_PRINCIPAL");
         String keytab = safe_getenv("SERVER_KEYTAB");
+
+        gss_manager = GSSManager.getInstance();
         jaas_config = new KrbConfiguration(keytab);
 
-        init_subject();
-        init_gss();
+        gss = new FPGss();
+        gss_server = gss.server(princ, keytab)
+            .flatMap(s -> s.login())
+            .orElseThrow(() -> new ServiceConfigurationError(
+                "Cannot get server GSS creds"));
+
         service_client = new FPServiceClient();
-    }
-
-    private void init_subject ()
-    {
-        krb_subject = new Subject();
-        try {
-            LoginContext ctx = new LoginContext(
-                "hivemq", krb_subject, 
-                new NullCallbackHandler(),
-                jaas_config);
-            ctx.login();
-        }
-        catch (LoginException e) {
-            log.error("Krb5 init failed: {}", e.toString());
-        }
-    }
-
-    private void init_gss ()
-    {
-
-        withKrbSubject("getting creds from keytab", () -> {
-            krb5Mech = new Oid("1.2.840.113554.1.2.2");
-            krb5PrincipalNT = new Oid("1.2.840.113554.1.2.2.1");
-            gss_manager = GSSManager.getInstance();
-
-            server_cred = gss_manager.createCredential(GSSCredential.ACCEPT_ONLY);
-            log.info("Got GSS creds:");
-            for (Oid mech : server_cred.getMechs()) {
-                log.info("  Oid {}, name {}", 
-                    mech, server_cred.getName(mech));
-            }
-        });
     }
 
     @Override
@@ -102,13 +80,14 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
 
     public String getServerPrincipal ()
     {
-        return server_principal;
+        return gss_server.getPrincipal();
     }
 
     public GSSContext createServerContext ()
-        throws GSSException
     {
-        return gss_manager.createContext(server_cred);
+        return gss_server.createContext()
+            .orElseThrow(() -> new ServiceConfigurationError(
+                "Cannot create server GSS context"));
     }
 
     public GSSContext createProxyContext ()
@@ -128,18 +107,15 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
             srv_nam, krb5Mech, cli_cred, GSSContext.DEFAULT_LIFETIME);
     }
 
-    public void withKrbSubject (String msg, GssAction action)
+    public <T> T withKrbSubject (String msg, PrivilegedExceptionAction<T> action)
     {
-        Subject.doAs(krb_subject, (PrivilegedAction<Object>)() -> {
-            try {
-                action.run();
-            }
-            catch (GSSException e) {
-                log.error("GSS error {}: {}", msg, e.toString());
-            }
-
+        try {
+            return Subject.doAs(krb_subject, action);
+        }
+        catch (PrivilegedActionException e) {
+            log.error(msg, e.toString());
             return null;
-        });
+        }
     }
 
     public Subject getSubjectWithPassword (String user, char[] passwd)

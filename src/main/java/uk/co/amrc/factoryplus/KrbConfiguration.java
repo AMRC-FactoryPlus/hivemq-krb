@@ -3,7 +3,7 @@
  * Copyright 2022 AMRC.
  */
 
-package uk.co.amrc.factoryplus.hivemq_auth_krb;
+package uk.co.amrc.factoryplus;
 
 import java.util.HashMap;
 import java.util.ServiceConfigurationError;
@@ -16,27 +16,45 @@ class KrbConfiguration extends Configuration {
     private String keytab;
     private String principal;
 
-    public KrbConfiguration (String keytab)
+    public KrbConfiguration (String principal, String keytab)
     {
         this.keytab = keytab;
+        this.principal = principal;
     }
+
+    public KrbConfiguration (String principal) { this(principal, null); }
+        
 
     public AppConfigurationEntry[] getAppConfigurationEntry(String name)
     {
         HashMap<String,String> opts = new HashMap();
 
-        if (name == "hivemq") {
+        switch (name) {
+        case "server":
             opts.put("doNotPrompt", "true");
             opts.put("useKeyTab", "true");
             opts.put("keyTab", keytab);
             opts.put("storeKey", "true");
             opts.put("isInitiator", "false");
-            opts.put("principal", "*");
-        }
-        else if (name == "hivemq-password") {
+            opts.put("principal", principal);
+            break;
+
+        case "client-password":
             opts.put("doNotPrompt", "false");
             opts.put("storeKey", "true");
             opts.put("isInitiator", "true");
+            break;
+
+        case "client-ccache":
+            opts.put("doNotPrompt", "true");
+            opts.put("storeKey", "true");
+            opts.put("isInitiator", "true");
+            opts.put("principal", principal);
+            opts.put("useTicketCache", "true");
+            break;
+
+        default:
+            return null;
         }
 
         AppConfigurationEntry[] rv = {

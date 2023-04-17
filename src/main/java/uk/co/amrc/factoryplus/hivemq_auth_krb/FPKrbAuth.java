@@ -150,8 +150,9 @@ public class FPKrbAuth implements EnhancedAuthenticator {
 
     private void verify_gssapi (byte[] in_buf, EnhancedAuthOutput output, boolean send_auth)
     {
-        provider.withKrbSubject("authenticating client", () -> {
-            GSSContext ctx = provider.createServerContext();
+        GSSContext ctx = provider.createServerContext();
+
+        try {
             /* It would be helpful to log the client and server
              * identities if this call fails, so we can see who was
              * trying to connect and what endpoint they were trying to
@@ -174,7 +175,11 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                 log.error("GSS login took more than one step!");
                 output.failAuthentication();
             }
-        });
+        }
+        catch (GSSException e) {
+            log.error("GSS login failed: {}", e);
+            output.failAuthentication();
+        }
     }
 
     private void setupACLs (EnhancedAuthOutput output, String principal)
