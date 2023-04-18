@@ -31,7 +31,7 @@ public class FPGssServer extends FPGssPrincipal {
 
     private GSSCredential creds;
 
-    public FPGssServer (FPGss provider, String principal, Subject subject)
+    public FPGssServer (FPGssProvider provider, String principal, Subject subject)
     {
         super(provider, principal, subject);
     }
@@ -42,7 +42,7 @@ public class FPGssServer extends FPGssPrincipal {
             creds = provider.getGSSManager()
                 .createCredential(GSSCredential.ACCEPT_ONLY);
 
-            log.info("Got GSS creds:");
+            log.info("Got GSS creds for server:");
             for (Oid mech : creds.getMechs()) {
                 log.info("  Oid {}, name {}", 
                     mech, creds.getName(mech));
@@ -51,8 +51,6 @@ public class FPGssServer extends FPGssPrincipal {
             return this;
         });
     }
-
-    public String getPrincipal () { return principal; }
 
     public Optional<GSSContext> createContext ()
     {

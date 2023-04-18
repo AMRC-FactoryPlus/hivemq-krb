@@ -8,6 +8,7 @@ package uk.co.amrc.factoryplus.hivemq_auth_krb;
 import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
@@ -43,16 +44,9 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
     private static final String TEMPLATE_UUID = "1266ddf1-156c-4266-9808-d6949418b185";
     private static final String ADDR_UUID = "8e32801b-f35a-4cbf-a5c3-2af64d3debd7";
 
-    private Oid krb5Mech;
-    private Oid krb5PrincipalNT;
-
     private FPServiceClient service_client;
 
-    private GSSManager gss_manager;
-    private Configuration jaas_config;
-    private Subject krb_subject;
-
-    private FPGss gss;
+    private FPGssProvider gss;
     private FPGssServer gss_server;
 
     public FPKrbAuthProvider ()
@@ -60,10 +54,7 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
         String princ = safe_getenv("SERVER_PRINCIPAL");
         String keytab = safe_getenv("SERVER_KEYTAB");
 
-        gss_manager = GSSManager.getInstance();
-        jaas_config = new KrbConfiguration(keytab);
-
-        gss = new FPGss();
+        gss = new FPGssProvider();
         gss_server = gss.server(princ, keytab)
             .flatMap(s -> s.login())
             .orElseThrow(() -> new ServiceConfigurationError(
@@ -78,11 +69,6 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
         return new FPKrbAuth(this);
     }
 
-    public String getServerPrincipal ()
-    {
-        return gss_server.getPrincipal();
-    }
-
     public GSSContext createServerContext ()
     {
         return gss_server.createContext()
@@ -90,49 +76,11 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
                 "Cannot create server GSS context"));
     }
 
-    public GSSContext createProxyContext ()
-        throws GSSException
+    public Optional<GSSContext> createProxyContext (String user, char[] passwd)
     {
-        GSSCredential cli_cred = gss_manager.createCredential(GSSCredential.INITIATE_ONLY);
-        //log.info("Got client GSS creds:");
-        //for (Oid mech : cli_cred.getMechs()) {
-        //    log.info("  Oid {}, name {}", 
-        //        mech, cli_cred.getName(mech));
-        //}
-
-        GSSName srv_nam = gss_manager.createName(
-            getServerPrincipal(), krb5PrincipalNT);
-
-        return gss_manager.createContext(
-            srv_nam, krb5Mech, cli_cred, GSSContext.DEFAULT_LIFETIME);
-    }
-
-    public <T> T withKrbSubject (String msg, PrivilegedExceptionAction<T> action)
-    {
-        try {
-            return Subject.doAs(krb_subject, action);
-        }
-        catch (PrivilegedActionException e) {
-            log.error(msg, e.toString());
-            return null;
-        }
-    }
-
-    public Subject getSubjectWithPassword (String user, char[] passwd)
-    {
-        try {
-            Subject subj = new Subject();
-            LoginContext ctx = new LoginContext(
-                "hivemq-password", subj, 
-                new PasswordCallbackHandler(user, passwd),
-                jaas_config);
-            ctx.login();
-            return subj;
-        }
-        catch (LoginException e) {
-            log.error("Krb5 password login failed: {}", e.toString());
-            return null;
-        }
+        return gss.clientWithPassword(user, passwd)
+            .flatMap(cli -> cli.login())
+            .flatMap(cli -> cli.createContext(gss_server.getPrincipal()));
     }
 
     public List<TopicPermission> getACLforPrincipal (String principal)

@@ -29,8 +29,36 @@ import org.json.*;
 public class FPGssClient extends FPGssPrincipal {
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
 
-    public FPGssClient (FPGss provider, String principal, Subject subject)
+    private GSSCredential creds;
+
+    public FPGssClient (FPGssProvider provider, String principal, Subject subject)
     {
         super(provider, principal, subject);
+    }
+
+    public Optional<FPGssClient> login ()
+    {
+        return withSubject("getting client credentials", () -> {
+            creds = provider.getGSSManager()
+                .createCredential(GSSCredential.INITIATE_ONLY);
+
+            log.info("Got GSS creds for client:");
+            for (Oid mech : creds.getMechs()) {
+                log.info("  Oid {}, name {}", 
+                    mech, creds.getName(mech));
+            }
+
+            return this;
+        });
+    }
+
+    public Optional<GSSContext> createContext (String server)
+    {
+        return withSubject("creating client context", () -> {
+            GSSManager mgr = provider.getGSSManager();
+            GSSName srv_nam = mgr.createName(server, provider.krb5PrincipalNT());
+            return mgr.createContext(
+                srv_nam, provider.krb5Mech(), creds, GSSContext.DEFAULT_LIFETIME);
+        });
     }
 }

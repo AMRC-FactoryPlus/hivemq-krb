@@ -29,18 +29,22 @@ import org.json.*;
 class FPGssPrincipal {
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
 
-    FPGss provider;
+    FPGssProvider provider;
     String principal;
     Subject subject;
 
-    public FPGssPrincipal (FPGss provider, String principal, Subject subject)
+    public FPGssPrincipal (FPGssProvider provider, 
+        String principal, Subject subject)
     {
         this.provider = provider;
         this.principal = principal;
         this.subject = subject;
     }
 
-    public <T> Optional<T> withSubject (String msg, PrivilegedExceptionAction<T> action)
+    public String getPrincipal () { return principal; }
+
+    public <T> Optional<T> withSubject (String msg, 
+        PrivilegedExceptionAction<T> action)
     {
         try {
             return Optional.of(Subject.doAs(subject, action));

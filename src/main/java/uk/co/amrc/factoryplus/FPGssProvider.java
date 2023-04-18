@@ -26,17 +26,17 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
-public class FPGss {
-    private static final Logger log = LoggerFactory.getLogger(FPGss.class);
+public class FPGssProvider {
+    private static final Logger log = LoggerFactory.getLogger(FPGssProvider.class);
 
     GSSManager gss_manager;
-    Oid krb5Mech, krb5PrincipalNT;
+    Oid _krb5Mech, _krb5PrincipalNT;
 
-    public FPGss ()
+    public FPGssProvider ()
     {
         try {
-            krb5Mech = new Oid("1.2.840.113554.1.2.2");
-            krb5PrincipalNT = new Oid("1.2.840.113554.1.2.2.1");
+            _krb5Mech = new Oid("1.2.840.113554.1.2.2");
+            _krb5PrincipalNT = new Oid("1.2.840.113554.1.2.2.1");
 
             gss_manager = GSSManager.getInstance();
         }
@@ -46,6 +46,8 @@ public class FPGss {
     }
 
     public GSSManager getGSSManager () { return gss_manager; }
+    public Oid krb5Mech () { return _krb5Mech; }
+    public Oid krb5PrincipalNT () { return _krb5PrincipalNT; }
 
     public Optional<Subject> buildSubject (
         String type, CallbackHandler cb, Configuration config
@@ -97,7 +99,8 @@ public class FPGss {
             .map(subj -> new FPGssClient(this, username, subj));
     }
 
-    public Optional<FPGssClient> clientWithPassword (String username, char[] password)
+    public Optional<FPGssClient> clientWithPassword (
+        String username, char[] password)
     {
         return buildClientSubjectWithPassword(password, username)
             .map(subj -> new FPGssClient(this, username, subj));

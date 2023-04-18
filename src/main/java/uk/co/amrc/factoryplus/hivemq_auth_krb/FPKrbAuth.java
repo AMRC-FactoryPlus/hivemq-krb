@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import javax.security.auth.Subject;
 import org.ietf.jgss.*;
 
 import org.slf4j.Logger;
@@ -117,35 +116,31 @@ public class FPKrbAuth implements EnhancedAuthenticator {
              * against a spoofed KDC. The only striaghtforward way to do
              * this is just to do the whole GSSAPI dance on the client's
              * behalf. */
-            byte[] gss_buf = get_client_gss_proxy(user, passwd_buf);
-            if (gss_buf == null) {
-                log.error("Password authentication failed for {}", user.toString());
-                output.failAuthentication();
-            }
-            else {
-                verify_gssapi(gss_buf, output, false);
-            }
+            get_client_gss_proxy(user, passwd_buf)
+                .ifPresentOrElse(
+                    buf -> verify_gssapi(buf, output, false),
+                    () -> {
+                        log.error("Password authentication failed for {}", 
+                            user.toString());
+                        output.failAuthentication();
+                    });
             asyncOutput.resume();
         });
     }
 
-    private byte[] get_client_gss_proxy (String user, char[] passwd_buf)
+    private Optional<byte[]> get_client_gss_proxy (
+        String user, char[] passwd_buf)
     {
-        Subject client = provider.getSubjectWithPassword(user, passwd_buf);
-        if (client == null) {
-            return null;
-        }
-
-        return Subject.doAs(client, (PrivilegedAction<byte[]>)() -> {
-            try {
-                GSSContext ctx = provider.createProxyContext();
-                return ctx.initSecContext(new byte[0], 0, 0);
-            }
-            catch (GSSException e) {
-                log.error("Client GSS exception: {}", e.toString());
-                return null;
-            }
-        });
+        return provider.createProxyContext(user, passwd_buf)
+            .flatMap(ctx -> {
+                try {
+                    return Optional.of(ctx.initSecContext(new byte[0], 0, 0));
+                }
+                catch (GSSException e) {
+                    log.error("GSS error for client proxy", e.toString());
+                    return Optional.<byte[]>empty();
+                }
+            });
     }
 
     private void verify_gssapi (byte[] in_buf, EnhancedAuthOutput output, boolean send_auth)
