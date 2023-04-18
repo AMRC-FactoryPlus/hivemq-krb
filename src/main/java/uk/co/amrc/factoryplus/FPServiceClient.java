@@ -3,11 +3,12 @@
  * Copyright 2022 AMRC.
  */
 
-package uk.co.amrc.factoryplus.hivemq_auth_krb;
+package uk.co.amrc.factoryplus;
 
 import java.net.*;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
@@ -28,8 +29,15 @@ import org.apache.hc.core5.net.URIBuilder;
 
 import org.json.*;
 
+import uk.co.amrc.factoryplus.gss.*;
+
 public class FPServiceClient {
     private static final Logger log = LoggerFactory.getLogger(FPServiceClient.class);
+
+    private Map<String, String> config;
+
+    private FPGssProvider _gss;
+    private FPGssServer _gss_server;
 
     private URI authn_service;
     private URI configdb_service;
@@ -37,13 +45,19 @@ public class FPServiceClient {
 
     private CloseableHttpClient http_client;
 
-    public FPServiceClient ()
-    {
-        authn_service = get_uri_env("AUTHN_URL");
-        configdb_service = get_uri_env("CONFIGDB_URL");
+    public FPServiceClient () { 
+        this(Map.<String,String>of());
+    }
 
-        String srv_user = safe_getenv("SERVICE_USERNAME");
-        String srv_pass = safe_getenv("SERVICE_PASSWORD");
+    public FPServiceClient (Map config)
+    {
+        this.config = config;
+
+        authn_service = getUriConf("authn_url");
+        configdb_service = getUriConf("configdb_url");
+
+        String srv_user = getConf("service_username");
+        String srv_pass = getConf("service_password");
         service_auth = "Basic " 
             + Base64.getEncoder().encodeToString(
                 (srv_user + ":" + srv_pass).getBytes());
@@ -56,18 +70,45 @@ public class FPServiceClient {
             .build();
     }
 
-    private String safe_getenv (String env)
+    public FPGssProvider gss ()
     {
+        if (_gss == null)
+            _gss = new FPGssProvider();
+        return _gss;
+    }
+
+    public FPGssServer gssServer ()
+    {
+        if (_gss_server == null) {
+            String princ = getConf("server_principal");
+            String keytab = getConf("server_keytab");
+
+            _gss_server = gss().server(princ, keytab)
+                .flatMap(s -> s.login())
+                .orElseThrow(() -> new ServiceConfigurationError(
+                    "Cannot get server GSS creds"));
+        }
+
+        return _gss_server;
+    }
+
+    public String getConf (String key)
+    {
+        if (config.containsKey(key))
+            return config.get(key);
+
+        String env = key.toUpperCase(Locale.ROOT);
         String val = System.getenv(env);
         if (val == null || val == "")
             throw new ServiceConfigurationError(
                 String.format("Environment variable %s must be set!", env));
+
         return val;
     }
 
-    private URI get_uri_env (String env)
+    public URI getUriConf (String env)
     {
-        String uri = safe_getenv(env);
+        String uri = getConf(env);
         try {
             return new URI(uri);
         }

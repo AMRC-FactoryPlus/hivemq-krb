@@ -3,7 +3,7 @@
  * Copyright 2022 AMRC.
  */
 
-package uk.co.amrc.factoryplus;
+package uk.co.amrc.factoryplus.gss;
 
 import javax.security.auth.callback.*;
 

@@ -44,23 +44,11 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
     private static final String TEMPLATE_UUID = "1266ddf1-156c-4266-9808-d6949418b185";
     private static final String ADDR_UUID = "8e32801b-f35a-4cbf-a5c3-2af64d3debd7";
 
-    private FPServiceClient service_client;
-
-    private FPGssProvider gss;
-    private FPGssServer gss_server;
+    private FPServiceClient fplus;
 
     public FPKrbAuthProvider ()
     {
-        String princ = safe_getenv("SERVER_PRINCIPAL");
-        String keytab = safe_getenv("SERVER_KEYTAB");
-
-        gss = new FPGssProvider();
-        gss_server = gss.server(princ, keytab)
-            .flatMap(s -> s.login())
-            .orElseThrow(() -> new ServiceConfigurationError(
-                "Cannot get server GSS creds"));
-
-        service_client = new FPServiceClient();
+        fplus = new FPServiceClient();
     }
 
     @Override
@@ -71,29 +59,32 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
 
     public GSSContext createServerContext ()
     {
-        return gss_server.createContext()
+        return fplus.gssServer()
+            .createContext()
             .orElseThrow(() -> new ServiceConfigurationError(
                 "Cannot create server GSS context"));
     }
 
     public Optional<GSSContext> createProxyContext (String user, char[] passwd)
     {
-        return gss.clientWithPassword(user, passwd)
+        String srv = fplus.gssServer().getPrincipal();
+        return fplus.gss()
+            .clientWithPassword(user, passwd)
             .flatMap(cli -> cli.login())
-            .flatMap(cli -> cli.createContext(gss_server.getPrincipal()));
+            .flatMap(cli -> cli.createContext(srv));
     }
 
     public List<TopicPermission> getACLforPrincipal (String principal)
     {
         try {
-            return service_client.authn_acl(principal, PERMGRP_UUID)
+            return fplus.authn_acl(principal, PERMGRP_UUID)
                 .flatMap(ace -> {
                     String perm = (String)ace.get("permission");
                     String targid = (String)ace.get("target");
 
-                    JSONObject template = service_client.configdb_fetch_object(TEMPLATE_UUID, perm);
+                    JSONObject template = fplus.configdb_fetch_object(TEMPLATE_UUID, perm);
                     Callable<JSONObject> target = 
-                        () -> service_client.configdb_fetch_object(ADDR_UUID, targid);
+                        () -> fplus.configdb_fetch_object(ADDR_UUID, targid);
 
                     return template.toMap()
                         .entrySet().stream()
@@ -107,14 +98,5 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
             log.error("Error resolving ACL for {}: {}", principal, e.toString());
             return List.of();
         }
-    }
-
-    private String safe_getenv (String key)
-    {
-        String val = System.getenv(key);
-        if (val == null)
-            throw new ServiceConfigurationError(String.format(
-                "%s needs to be set in the environment!", key));
-        return val;
     }
 }
