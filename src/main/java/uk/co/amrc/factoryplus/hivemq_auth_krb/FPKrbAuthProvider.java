@@ -82,9 +82,13 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
                     String perm = (String)ace.get("permission");
                     String targid = (String)ace.get("target");
 
-                    JSONObject template = fplus.configdb_fetch_object(TEMPLATE_UUID, perm);
-                    Callable<JSONObject> target = 
-                        () -> fplus.configdb_fetch_object(ADDR_UUID, targid);
+                    JSONObject template = fplus
+                        .configdb_fetch_object(TEMPLATE_UUID, perm)
+                        .orElseGet(() -> new JSONObject());
+
+                    Callable<JSONObject> target = () -> fplus
+                        .configdb_fetch_object(ADDR_UUID, targid)
+                        .orElseGet(() -> new JSONObject());
 
                     return template.toMap()
                         .entrySet().stream()

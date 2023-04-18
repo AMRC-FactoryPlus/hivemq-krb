@@ -38,12 +38,10 @@ public class FPServiceClient {
 
     private FPGssProvider _gss;
     private FPGssServer _gss_server;
+    private FPHttpClient _http;
 
     private URI authn_service;
     private URI configdb_service;
-    private String service_auth;
-
-    private CloseableHttpClient http_client;
 
     public FPServiceClient () { 
         this(Map.<String,String>of());
@@ -55,41 +53,6 @@ public class FPServiceClient {
 
         authn_service = getUriConf("authn_url");
         configdb_service = getUriConf("configdb_url");
-
-        String srv_user = getConf("service_username");
-        String srv_pass = getConf("service_password");
-        service_auth = "Basic " 
-            + Base64.getEncoder().encodeToString(
-                (srv_user + ":" + srv_pass).getBytes());
-
-        CacheConfig cache_config = CacheConfig.custom()
-            .setSharedCache(false)
-            .build();
-        http_client = CachingHttpClients.custom()
-            .setCacheConfig(cache_config)
-            .build();
-    }
-
-    public FPGssProvider gss ()
-    {
-        if (_gss == null)
-            _gss = new FPGssProvider();
-        return _gss;
-    }
-
-    public FPGssServer gssServer ()
-    {
-        if (_gss_server == null) {
-            String princ = getConf("server_principal");
-            String keytab = getConf("server_keytab");
-
-            _gss_server = gss().server(princ, keytab)
-                .flatMap(s -> s.login())
-                .orElseThrow(() -> new ServiceConfigurationError(
-                    "Cannot get server GSS creds"));
-        }
-
-        return _gss_server;
     }
 
     public String getConf (String key)
@@ -118,46 +81,33 @@ public class FPServiceClient {
         }
     }
 
-    public Object fetch (String method, URI uri, JSONObject json)
+    public FPGssProvider gss ()
     {
-        try {
-            //log.info("Fetch: req: {} {}", method, uri.toString());
-            Request req = Request.create(method, uri)
-                .setHeader("Authorization", service_auth);
-
-            if (json != null) {
-                req.bodyString(json.toString(), ContentType.APPLICATION_JSON);
-            }
-
-            Response rsp = req.execute(http_client);
-            String body = rsp.returnContent().asString();
-            //log.info("Fetch: rsp: {}", body);
-            
-            if (body == null) return null;
-            return new JSONTokener(body).nextValue();
-        }
-        catch (HttpResponseException e) {
-            int st = e.getStatusCode();
-            if (st != 404)
-                log.error("Fetch HTTP error: {}", st);
-            return null;
-        }
-        catch (Exception e) {
-            log.info("Fetch error: {}", e);
-            return null;
-        }
+        if (_gss == null)
+            _gss = new FPGssProvider();
+        return _gss;
     }
 
-    public Object fetch (String method, URIBuilder builder, JSONObject json)
+    public FPGssServer gssServer ()
     {
-        try {
-            URI uri = builder.build();
-            return fetch(method, uri, json);
+        if (_gss_server == null) {
+            String princ = getConf("server_principal");
+            String keytab = getConf("server_keytab");
+
+            _gss_server = gss().server(princ, keytab)
+                .flatMap(s -> s.login())
+                .orElseThrow(() -> new ServiceConfigurationError(
+                    "Cannot get server GSS creds"));
         }
-        catch (URISyntaxException e) {
-            log.error("Fetch for bad URI: {}", e.toString());
-            return null;
-        }
+
+        return _gss_server;
+    }
+
+    public FPHttpClient http ()
+    {
+        if (_http == null)
+            _http = new FPHttpClient(this);
+        return _http;
     }
 
     public Stream<String> configdb_list_objects (String appid)
@@ -166,20 +116,26 @@ public class FPServiceClient {
             .appendPath("/v1/app")
             .appendPath(appid)
             .appendPath("object");
-        JSONArray ary = (JSONArray)fetch("GET", path, null);
 
-        if (ary == null) return null;
-        return ary.toList().stream().map(o -> (String)o);
+        return http().fetch("GET", path, null)
+            .stream()
+            .filter(o -> o instanceof JSONArray)
+            .map(o -> (JSONArray)o)
+            .flatMap(ary -> ary.toList().stream())
+            .filter(o -> o instanceof String)
+            .map(o -> (String)o);
     }
 
-    public JSONObject configdb_fetch_object (String appid, String objid)
+    public Optional<JSONObject> configdb_fetch_object (String appid, String objid)
     {
         URIBuilder path = new URIBuilder(configdb_service)
             .appendPath("/v1/app")
             .appendPath(appid)
             .appendPath("object")
             .appendPath(objid);
-        return (JSONObject)fetch("GET", path, null);
+
+        return http().fetch("GET", path, null)
+            .map(o -> o instanceof JSONObject ? (JSONObject)o : null);
     }
 
     public Stream<Map> authn_acl (String princ, String perms)
@@ -188,12 +144,15 @@ public class FPServiceClient {
             .appendPath("/authz/acl")
             .setParameter("principal", princ)
             .setParameter("permission", perms);
-        //log.info("ACL url {}", acl_url);
-        JSONArray acl = (JSONArray)fetch("GET", acl_url, null);
-        log.info("F+ ACL [{}]: {}", princ, acl);
 
-        if (acl == null) return null;
-        return acl.toList().stream().map(o -> (Map)o);
+        Optional<JSONArray> acl = http().fetch("GET", acl_url, null)
+            .map(o -> o instanceof JSONArray ? (JSONArray)o : null);
+        log.info("F+ ACL [{}]: {}", princ, acl.orElse(null));
+
+        return acl.stream()
+            .flatMap(ary -> ary.toList().stream())
+            .filter(o -> o instanceof Map)
+            .map(o -> (Map)o);
     }
 }
 
