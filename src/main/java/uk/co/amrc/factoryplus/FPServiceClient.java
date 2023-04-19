@@ -81,14 +81,14 @@ public class FPServiceClient {
         }
     }
 
-    public FPGssProvider gss ()
+    synchronized public FPGssProvider gss ()
     {
         if (_gss == null)
             _gss = new FPGssProvider();
         return _gss;
     }
 
-    public FPGssServer gssServer ()
+    synchronized public FPGssServer gssServer ()
     {
         if (_gss_server == null) {
             String princ = getConf("server_principal");
@@ -103,7 +103,7 @@ public class FPServiceClient {
         return _gss_server;
     }
 
-    public FPHttpClient http ()
+    synchronized public FPHttpClient http ()
     {
         if (_http == null)
             _http = new FPHttpClient(this);
