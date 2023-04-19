@@ -43,10 +43,10 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         public byte[] gssToken;
         public List<TopicPermission> acl;
 
-        public AuthResult (byte[] tok, Stream<TopicPermission> acl)
+        public AuthResult (byte[] tok, List<TopicPermission> acl)
         {
             this.gssToken = tok;
-            this.acl = acl.collect(Collectors.toList());
+            this.acl = acl;
         }
 
         public void applyACL (EnhancedAuthOutput output)
@@ -116,7 +116,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
             Duration.ofSeconds(10), TimeoutFallback.FAILURE);
 
         verify_gssapi(in_buf)
-            .doOnTerminate(() -> asyncOutput.resume())
+            .doAfterTerminate(() -> asyncOutput.resume())
             .subscribe(
                 rv -> {
                     rv.applyACL(output);
@@ -158,19 +158,16 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                     user.toString());
                 output.failAuthentication();
                 asyncOutput.resume();
+                return;
             }
             verify_gssapi(buf.get())
-                .doOnTerminate(() -> asyncOutput.resume())
+                .doAfterTerminate(() -> asyncOutput.resume())
                 .subscribe(
                     rv -> {
                         rv.applyACL(output);
                         output.authenticateSuccessfully();
                     },
-                    e -> {
-                        log.error("Failed to verify service ticket for {}",
-                            user);
-                        output.failAuthentication();
-                    });
+                    e -> output.failAuthentication());
         });
     }
 

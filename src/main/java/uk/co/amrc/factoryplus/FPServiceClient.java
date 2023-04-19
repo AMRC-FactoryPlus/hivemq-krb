@@ -40,6 +40,7 @@ public class FPServiceClient {
     private FPGssServer _gss_server;
     private FPHttpClient _http;
     private FPDiscovery _discovery;
+    private FPConfigDB _configdb;
 
     private URI configdb_service;
 
@@ -132,6 +133,13 @@ public class FPServiceClient {
         if (_discovery == null)
             _discovery = new FPDiscovery(this);
         return _discovery;
+    }
+
+    synchronized public FPConfigDB configdb ()
+    {
+        if (_configdb == null)
+            _configdb = new FPConfigDB(this);
+        return _configdb;
     }
 
     public Stream<String> configdb_list_objects (String appid)
