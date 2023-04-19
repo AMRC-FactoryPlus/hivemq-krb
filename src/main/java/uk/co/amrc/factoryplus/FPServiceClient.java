@@ -7,7 +7,6 @@ package uk.co.amrc.factoryplus;
 
 import java.net.*;
 import java.util.Base64;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -162,26 +161,26 @@ public class FPServiceClient {
             .map(o -> o instanceof JSONObject ? (JSONObject)o : null);
     }
 
-    public Stream<Map> authn_acl (String princ, String perms)
+    public Single<Stream<Map>> authn_acl (String princ, String perms)
     {
         Set<URI> urls = discovery().lookup(FPUuid.Service.Authentication);
         if (urls.isEmpty())
-            return Stream.<Map>empty();
+            return Single.<Stream<Map>>error(
+                new Exception("Cannot find Auth service URL"));
         /* Just take the first (only) for now. */
         URI authn_service = urls.iterator().next();
+
         URIBuilder acl_url = new URIBuilder(authn_service)
             .appendPath("/authz/acl")
             .setParameter("principal", princ)
             .setParameter("permission", perms);
 
-        Optional<JSONArray> acl = http().fetch("GET", acl_url, null)
-            .map(o -> o instanceof JSONArray ? (JSONArray)o : null);
-        log.info("F+ ACL [{}]: {}", princ, acl.orElse(null));
-
-        return acl.stream()
-            .flatMap(ary -> ary.toList().stream())
-            .filter(o -> o instanceof Map)
-            .map(o -> (Map)o);
+        return http().fetchRx("GET", acl_url, null)
+            .cast(JSONArray.class)
+            .doOnSuccess(acl -> log.info("F+ ACL [{}]: {}", princ, acl))
+            .map(acl -> acl.toList().stream()
+                .filter(o -> o instanceof Map)
+                .map(o -> (Map)o));
     }
 }
 

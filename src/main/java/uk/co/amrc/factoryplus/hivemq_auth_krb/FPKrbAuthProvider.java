@@ -25,6 +25,9 @@ import org.slf4j.LoggerFactory;
 
 import org.ietf.jgss.*;
 import org.json.*;
+import org.apache.hc.core5.net.URIBuilder;
+
+import io.reactivex.rxjava3.core.*;
 
 import uk.co.amrc.factoryplus.*;
 
@@ -78,10 +81,10 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
             .flatMap(cli -> cli.createContext(srv));
     }
 
-    public List<TopicPermission> getACLforPrincipal (String principal)
+    public Single<Stream<TopicPermission>> getACLforPrincipal (String principal)
     {
-        try {
-            return fplus.authn_acl(principal, PERMGRP_UUID)
+        return fplus.authn_acl(principal, PERMGRP_UUID)
+            .map(acl -> acl
                 .flatMap(ace -> {
                     String perm = (String)ace.get("permission");
                     String targid = (String)ace.get("target");
@@ -99,12 +102,6 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
                         .map(e -> new MqttAce(e.getKey(), e.getValue(), target))
                         .filter(m_ace -> m_ace.getActivity() != null)
                         .map(m_ace -> m_ace.toTopicPermission());
-                })
-                .collect(Collectors.toList());
-        }
-        catch (Exception e) {
-            log.error("Error resolving ACL for {}: {}", principal, e.toString());
-            return List.of();
-        }
+                }));
     }
 }
