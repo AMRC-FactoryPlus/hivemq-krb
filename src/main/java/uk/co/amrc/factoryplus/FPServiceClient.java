@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
+import java.util.Set;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
@@ -39,8 +40,8 @@ public class FPServiceClient {
     private FPGssProvider _gss;
     private FPGssServer _gss_server;
     private FPHttpClient _http;
+    private FPDiscovery _discovery;
 
-    private URI authn_service;
     private URI configdb_service;
 
     public FPServiceClient () { 
@@ -50,8 +51,6 @@ public class FPServiceClient {
     public FPServiceClient (Map config)
     {
         this.config = config;
-
-        authn_service = getUriConf("authn_url");
         configdb_service = getUriConf("configdb_url");
     }
 
@@ -110,6 +109,13 @@ public class FPServiceClient {
         return _http;
     }
 
+    synchronized public FPDiscovery discovery ()
+    {
+        if (_discovery == null)
+            _discovery = new FPDiscovery(this);
+        return _discovery;
+    }
+
     public Stream<String> configdb_list_objects (String appid)
     {
         URIBuilder path = new URIBuilder(configdb_service)
@@ -140,6 +146,11 @@ public class FPServiceClient {
 
     public Stream<Map> authn_acl (String princ, String perms)
     {
+        Set<URI> urls = discovery().lookup(FPUuid.Service.Authentication);
+        if (urls.isEmpty())
+            return Stream.<Map>empty();
+        /* Just take the first (only) for now. */
+        URI authn_service = urls.iterator().next();
         URIBuilder acl_url = new URIBuilder(authn_service)
             .appendPath("/authz/acl")
             .setParameter("principal", princ)
