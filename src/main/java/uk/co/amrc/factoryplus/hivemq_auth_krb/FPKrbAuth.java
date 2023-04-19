@@ -116,7 +116,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
             Duration.ofSeconds(10), TimeoutFallback.FAILURE);
 
         verify_gssapi(in_buf)
-            .doAfterTerminate(() -> asyncOutput.resume())
+            .doOnTerminate(() -> asyncOutput.resume())
             .subscribe(
                 rv -> {
                     rv.applyACL(output);
@@ -158,16 +158,19 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                     user.toString());
                 output.failAuthentication();
                 asyncOutput.resume();
-                return;
             }
             verify_gssapi(buf.get())
-                .doAfterTerminate(() -> asyncOutput.resume())
+                .doOnTerminate(() -> asyncOutput.resume())
                 .subscribe(
                     rv -> {
                         rv.applyACL(output);
                         output.authenticateSuccessfully();
                     },
-                    e -> output.failAuthentication());
+                    e -> {
+                        log.error("Failed to verify service ticket for {}",
+                            user);
+                        output.failAuthentication();
+                    });
         });
     }
 

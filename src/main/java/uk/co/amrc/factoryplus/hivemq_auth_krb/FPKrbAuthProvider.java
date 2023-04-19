@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
@@ -43,7 +44,8 @@ import com.hivemq.extension.sdk.api.services.builder.Builders;
 public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
 {
     private static final Logger log = LoggerFactory.getLogger(FPKrbAuth.class);
-    private static final String PERMGRP_UUID = "a637134a-d06b-41e7-ad86-4bf62fde914a";
+    private static final UUID PERMGRP_UUID = UUID.fromString(
+        "a637134a-d06b-41e7-ad86-4bf62fde914a");
     private static final String TEMPLATE_UUID = "1266ddf1-156c-4266-9808-d6949418b185";
     private static final String ADDR_UUID = "8e32801b-f35a-4cbf-a5c3-2af64d3debd7";
 

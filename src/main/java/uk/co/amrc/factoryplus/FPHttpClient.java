@@ -11,7 +11,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.ServiceConfigurationError;
+import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
@@ -58,9 +60,30 @@ public class FPHttpClient {
             .build();
     }
 
-    public Single<Object> fetchRx (String method, URIBuilder uri,
-        JSONObject body)
+    public FPHttpRequest request (UUID service, String method)
     {
+        return new FPHttpRequest(this, service, method);
+    }
+
+    /* Java's URI class doesn't resolve relative URIs properly unless
+     * there is an explicit path component. */
+    private URI fixPath (URI uri)
+    {
+        return uri.getPath().length() == 0 ? uri.resolve("/") : uri;
+    }
+
+    public Single<Object> execute (UUID service, String method,
+        String path, JSONObject body)
+    {
+        Set<URI> urls = fplus.discovery().lookup(service);
+        if (urls.isEmpty())
+            return Single.<Object>error(
+                new Exception("Cannot find service URL"));
+
+        /* Just take the first (only) for now. */
+        URI srv_base = fixPath(urls.iterator().next());
+        URI uri = srv_base.resolve(path);
+
         return Single.fromCallable(() -> {
                 FPThreadUtil.logId("calling fetch");
                 return fetch(method, uri, body)

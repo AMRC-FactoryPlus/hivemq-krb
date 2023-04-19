@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Executor;
 import java.util.stream.Stream;
@@ -161,21 +162,14 @@ public class FPServiceClient {
             .map(o -> o instanceof JSONObject ? (JSONObject)o : null);
     }
 
-    public Single<Stream<Map>> authn_acl (String princ, String perms)
+    public Single<Stream<Map>> authn_acl (String princ, UUID perms)
     {
-        Set<URI> urls = discovery().lookup(FPUuid.Service.Authentication);
-        if (urls.isEmpty())
-            return Single.<Stream<Map>>error(
-                new Exception("Cannot find Auth service URL"));
-        /* Just take the first (only) for now. */
-        URI authn_service = urls.iterator().next();
-
-        URIBuilder acl_url = new URIBuilder(authn_service)
-            .appendPath("/authz/acl")
-            .setParameter("principal", princ)
-            .setParameter("permission", perms);
-
-        return http().fetchRx("GET", acl_url, null)
+        return http().request(FPUuid.Service.Authentication, "GET")
+            .withURIBuilder(b -> b
+                .appendPath("authz/acl")
+                .setParameter("principal", princ)
+                .setParameter("permission", perms.toString()))
+            .fetch()
             .cast(JSONArray.class)
             .doOnSuccess(acl -> log.info("F+ ACL [{}]: {}", princ, acl))
             .map(acl -> acl.toList().stream()
