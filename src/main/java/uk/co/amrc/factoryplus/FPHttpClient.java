@@ -29,6 +29,8 @@ import org.apache.hc.core5.net.URIBuilder;
 
 import org.json.*;
 
+import io.reactivex.rxjava3.core.Single;
+
 import uk.co.amrc.factoryplus.gss.*;
 
 public class FPHttpClient {
@@ -56,10 +58,22 @@ public class FPHttpClient {
             .build();
     }
 
+    public Single<Object> fetchRx (String method, URIBuilder uri,
+        JSONObject body)
+    {
+        return Single.fromCallable(() -> {
+                FPThreadUtil.logId("calling fetch");
+                return fetch(method, uri, body)
+                    .orElseThrow(() ->
+                        new Exception("fetch failed!"));
+            })
+            .subscribeOn(fplus.getScheduler());
+    }
+
     public Optional<Object> fetch (String method, URI uri, JSONObject json)
     {
         try {
-            //log.info("Fetch: req: {} {}", method, uri.toString());
+            log.info("Fetch: req: {} {}", method, uri.toString());
             Request req = Request.create(method, uri)
                 .setHeader("Authorization", service_auth);
 
@@ -67,6 +81,7 @@ public class FPHttpClient {
                 req.bodyString(json.toString(), ContentType.APPLICATION_JSON);
             }
 
+            FPThreadUtil.logId("fetch called");
             Response rsp = req.execute(http_client);
             String body = rsp.returnContent().asString();
             //log.info("Fetch: rsp: {}", body);

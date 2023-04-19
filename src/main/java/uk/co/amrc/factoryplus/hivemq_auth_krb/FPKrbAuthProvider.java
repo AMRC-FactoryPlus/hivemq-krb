@@ -49,6 +49,10 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
     public FPKrbAuthProvider ()
     {
         fplus = new FPServiceClient();
+        /* HiveMQ recommend using their thread pool. However it looks
+         * like this only has one thread, which means all our fetch
+         * calls get serialised. So for now stick to using our own. */
+        //fplus.setExecutor(Services.extensionExecutorService());
     }
 
     @Override
