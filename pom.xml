@@ -166,7 +166,7 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
+            <!-- plugin>
                 <groupId>org.asciidoctor</groupId>
                 <artifactId>asciidoctor-maven-plugin</artifactId>
                 <version>${asciidoctor.version}</version>
@@ -191,7 +191,7 @@
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
+            </plugin-->
         </plugins>
     </build>
     <profiles>
