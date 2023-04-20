@@ -72,21 +72,20 @@ public class FPHttpClient {
         return uri.getPath().length() == 0 ? uri.resolve("/") : uri;
     }
 
-    public Single<Object> execute (UUID service, String method,
-        String path, JSONObject body)
+    public Single<Object> execute (FPHttpRequest req)
     {
-        Set<URI> urls = fplus.discovery().lookup(service);
+        Set<URI> urls = fplus.discovery().lookup(req.service);
         if (urls.isEmpty())
             return Single.<Object>error(
                 new Exception("Cannot find service URL"));
 
         /* Just take the first (only) for now. */
         URI srv_base = fixPath(urls.iterator().next());
-        URI uri = srv_base.resolve(path);
+        URI uri = srv_base.resolve(req.path);
 
         return Single.fromCallable(() -> {
                 FPThreadUtil.logId("calling fetch");
-                return fetch(method, uri, body)
+                return fetch(req.method, uri, req.body)
                     .orElseThrow(() ->
                         new Exception("fetch failed!"));
             })

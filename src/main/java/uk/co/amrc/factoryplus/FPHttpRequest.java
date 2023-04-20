@@ -14,11 +14,12 @@ import org.json.JSONObject;
 import io.reactivex.rxjava3.core.Single;
 
 class FPHttpRequest {
-    private FPHttpClient client;
-    private UUID service;
-    private String method;
-    private String path;
-    private JSONObject body;
+    /* These are package-scoped; FPHttpClient wants 'friend' access. */
+    FPHttpClient client;
+    UUID service;
+    String method;
+    String path;
+    JSONObject body;
 
     public FPHttpRequest (FPHttpClient client, UUID service, String method)
     {
@@ -49,6 +50,6 @@ class FPHttpRequest {
 
     public Single<Object> fetch ()
     {
-        return client.execute(service, method, path, body);
+        return client.execute(this);
     }
 }
