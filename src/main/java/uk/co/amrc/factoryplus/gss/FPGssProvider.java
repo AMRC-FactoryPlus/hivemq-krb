@@ -72,9 +72,9 @@ public class FPGssProvider {
         return buildSubject("server", cb, config);
     }
 
-    public Optional<Subject> buildClientSubjectWithCcache (String principal)
+    public Optional<Subject> buildClientSubjectWithCcache ()
     {
-        Configuration config = new KrbConfiguration(principal);
+        Configuration config = new KrbConfiguration();
         CallbackHandler cb = new NullCallbackHandler();
         return buildSubject("client-keytab", cb, config);
     }
@@ -82,7 +82,7 @@ public class FPGssProvider {
     public Optional<Subject> buildClientSubjectWithPassword (
         char[] password, String principal
     ) {
-        Configuration config = new KrbConfiguration(principal);
+        Configuration config = new KrbConfiguration();
         CallbackHandler cb = new PasswordCallbackHandler(principal, password);
         return buildSubject("client-password", cb, config);
     }
@@ -93,16 +93,16 @@ public class FPGssProvider {
             .map(subj -> new FPGssServer(this, principal, subj));
     }
 
-    public Optional<FPGssClient> clientWithCcache (String username)
+    public Optional<FPGssClient> clientWithCcache ()
     {
-        return buildClientSubjectWithCcache(username)
-            .map(subj -> new FPGssClient(this, username, subj));
+        return buildClientSubjectWithCcache()
+            .map(subj -> new FPGssClient(this, subj));
     }
 
     public Optional<FPGssClient> clientWithPassword (
         String username, char[] password)
     {
         return buildClientSubjectWithPassword(password, username)
-            .map(subj -> new FPGssClient(this, username, subj));
+            .map(subj -> new FPGssClient(this, subj));
     }
 }

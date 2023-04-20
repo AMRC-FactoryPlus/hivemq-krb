@@ -39,6 +39,7 @@ public class FPServiceClient {
 
     private FPGssProvider _gss;
     private FPGssServer _gss_server;
+    private FPGssClient _gss_client;
     private FPHttpClient _http;
     private FPDiscovery _discovery;
     private FPConfigDB _configdb;
@@ -54,16 +55,22 @@ public class FPServiceClient {
 
     public String getConf (String key)
     {
+        return getOptionalConf(key)
+            .orElseThrow(() -> new ServiceConfigurationError(
+                String.format("Config %s not found!", key)));
+    }
+
+    public Optional<String> getOptionalConf (String key)
+    {
         if (config.containsKey(key))
-            return config.get(key);
+            return Optional.of(config.get(key));
 
         String env = key.toUpperCase(Locale.ROOT);
         String val = System.getenv(env);
         if (val == null || val == "")
-            throw new ServiceConfigurationError(
-                String.format("Environment variable %s must be set!", env));
+            return Optional.<String>empty();
 
-        return val;
+        return Optional.of(val);
     }
 
     public URI getUriConf (String env)
@@ -117,6 +124,24 @@ public class FPServiceClient {
         }
 
         return _gss_server;
+    }
+
+    synchronized public FPGssClient gssClient ()
+    {
+        if (_gss_client == null) {
+            var user = getOptionalConf("service_username");
+            var passwd = getOptionalConf("service_password");
+
+            var cli = user.isEmpty() || passwd.isEmpty()
+                ? gss().clientWithCcache()
+                : gss().clientWithPassword(user.get(),
+                    passwd.get().toCharArray());
+            _gss_client = cli
+                .flatMap(c -> c.login())
+                .orElseThrow(() -> new ServiceConfigurationError(
+                    "Cannot get client GSS creds"));
+        }
+        return _gss_client;
     }
 
     synchronized public FPHttpClient http ()

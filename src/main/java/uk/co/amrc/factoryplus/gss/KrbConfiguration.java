@@ -22,8 +22,7 @@ class KrbConfiguration extends Configuration {
         this.principal = principal;
     }
 
-    public KrbConfiguration (String principal) { this(principal, null); }
-        
+    public KrbConfiguration () { }
 
     public AppConfigurationEntry[] getAppConfigurationEntry(String name)
     {
@@ -49,7 +48,6 @@ class KrbConfiguration extends Configuration {
             opts.put("doNotPrompt", "true");
             opts.put("storeKey", "true");
             opts.put("isInitiator", "true");
-            opts.put("principal", principal);
             opts.put("useTicketCache", "true");
             break;
 

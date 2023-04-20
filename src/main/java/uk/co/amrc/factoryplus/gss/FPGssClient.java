@@ -31,9 +31,20 @@ public class FPGssClient extends FPGssPrincipal {
 
     private GSSCredential creds;
 
-    public FPGssClient (FPGssProvider provider, String principal, Subject subject)
+    public FPGssClient (FPGssProvider provider, Subject subject)
     {
-        super(provider, principal, subject);
+        super(provider, subject);
+    }
+
+    public String getPrincipal ()
+    {
+        try {
+            return creds.getName(provider.krb5Mech()).toString();
+        }
+        catch (GSSException e) {
+            throw new ServiceConfigurationError(
+                "Can't read GSS principal name", e);
+        }
     }
 
     public Optional<FPGssClient> login ()

@@ -26,22 +26,19 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
-class FPGssPrincipal {
+public abstract class FPGssPrincipal {
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
 
     FPGssProvider provider;
-    String principal;
     Subject subject;
 
-    public FPGssPrincipal (FPGssProvider provider, 
-        String principal, Subject subject)
+    public FPGssPrincipal (FPGssProvider provider, Subject subject)
     {
         this.provider = provider;
-        this.principal = principal;
         this.subject = subject;
     }
 
-    public String getPrincipal () { return principal; }
+    public abstract String getPrincipal ();
 
     public <T> Optional<T> withSubject (String msg, 
         PrivilegedExceptionAction<T> action)

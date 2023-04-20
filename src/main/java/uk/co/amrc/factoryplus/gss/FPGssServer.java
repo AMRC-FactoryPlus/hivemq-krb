@@ -29,12 +29,16 @@ import org.json.*;
 public class FPGssServer extends FPGssPrincipal {
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
 
+    String principal;
     private GSSCredential creds;
 
     public FPGssServer (FPGssProvider provider, String principal, Subject subject)
     {
-        super(provider, principal, subject);
+        super(provider, subject);
+        this.principal = principal;
     }
+
+    public String getPrincipal () { return principal; }
 
     public Optional<FPGssServer> login ()
     {
