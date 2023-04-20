@@ -65,11 +65,22 @@ public class FPGssClient extends FPGssPrincipal {
 
     public Optional<GSSContext> createContext (String server)
     {
+        return _createContext(server, provider.krb5PrincipalNT());
+    }
+
+    public Optional<GSSContext> createContextHB (String service)
+    {
+        return _createContext(service, GSSName.NT_HOSTBASED_SERVICE);
+    }
+
+    private Optional<GSSContext> _createContext (String name, Oid type)
+    {
         return withSubject("creating client context", () -> {
+            Oid mech = provider.krb5Mech();
             GSSManager mgr = provider.getGSSManager();
-            GSSName srv_nam = mgr.createName(server, provider.krb5PrincipalNT());
+            GSSName srv_nam = mgr.createName(name, type, mech);
             return mgr.createContext(
-                srv_nam, provider.krb5Mech(), creds, GSSContext.DEFAULT_LIFETIME);
+                srv_nam, mech, creds, GSSContext.DEFAULT_LIFETIME);
         });
     }
 }
