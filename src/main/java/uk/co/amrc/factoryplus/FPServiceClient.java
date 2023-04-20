@@ -28,6 +28,7 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.core.*;
 
 import uk.co.amrc.factoryplus.gss.*;
+import uk.co.amrc.factoryplus.http.*;
 
 public class FPServiceClient {
     private static final Logger log = LoggerFactory.getLogger(FPServiceClient.class);

@@ -3,7 +3,7 @@
  * Copyright 2023 AMRC.
  */
 
-package uk.co.amrc.factoryplus;
+package uk.co.amrc.factoryplus.http;
 
 import java.net.*;
 import java.util.Base64;
@@ -33,6 +33,7 @@ import org.json.*;
 
 import io.reactivex.rxjava3.core.Single;
 
+import uk.co.amrc.factoryplus.*;
 import uk.co.amrc.factoryplus.gss.*;
 
 public class FPHttpClient {

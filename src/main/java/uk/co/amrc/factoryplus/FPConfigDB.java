@@ -25,6 +25,8 @@ import org.json.*;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.core.*;
 
+import uk.co.amrc.factoryplus.http.*;
+
 public class FPConfigDB {
     private static final Logger log = LoggerFactory.getLogger(FPConfigDB.class);
     private static final UUID SERVICE = FPUuid.Service.ConfigDB;

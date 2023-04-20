@@ -3,7 +3,7 @@
  * Copyright 2023 AMRC.
  */
 
-package uk.co.amrc.factoryplus;
+package uk.co.amrc.factoryplus.http;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
