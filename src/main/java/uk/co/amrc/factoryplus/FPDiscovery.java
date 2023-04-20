@@ -25,6 +25,8 @@ public class FPDiscovery {
     {
         this.fplus = fplus;
         this.cache = Map.of(
+            FPUuid.Service.Directory,
+                Set.of(fplus.getUriConf("directory_url")),
             FPUuid.Service.Authentication,
                 Set.of(fplus.getUriConf("authn_url")),
             FPUuid.Service.ConfigDB,
