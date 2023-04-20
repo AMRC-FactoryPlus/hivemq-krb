@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 public class FPThreadUtil {
     static final Logger log = LoggerFactory.getLogger(FPThreadUtil.class);
 
-    static void logId (String msg)
+    public static void logId (String msg)
     {
         log.info("{} on {} ({})",
             msg,

@@ -13,7 +13,7 @@ import org.json.JSONObject;
 
 import io.reactivex.rxjava3.core.Single;
 
-class FPHttpRequest {
+public class FPHttpRequest {
     /* These are package-scoped; FPHttpClient wants 'friend' access. */
     FPHttpClient client;
     UUID service;
