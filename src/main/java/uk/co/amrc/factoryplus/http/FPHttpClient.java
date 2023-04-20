@@ -17,6 +17,8 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import org.ietf.jgss.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +44,7 @@ public class FPHttpClient {
     private FPServiceClient fplus;
     private CloseableHttpClient http_client;
     private String service_auth;
+    private TokenCache tokens;
 
     public FPHttpClient (FPServiceClient fplus)
     {
@@ -59,6 +62,8 @@ public class FPHttpClient {
         http_client = CachingHttpClients.custom()
             .setCacheConfig(cache_config)
             .build();
+
+        tokens = new TokenCache(this::tokenFor);
     }
 
     public FPHttpRequest request (UUID service, String method)
@@ -73,37 +78,83 @@ public class FPHttpClient {
         return uri.getPath().length() == 0 ? uri.resolve("/") : uri;
     }
 
-    public Single<Object> execute (FPHttpRequest req)
+    private Request makeRequest (String method, URI base, String path,
+        String auth)
     {
-        Set<URI> urls = fplus.discovery().lookup(req.service);
+        URI uri = base.resolve(path);
+        Request req = Request.create(method, uri)
+            .setHeader("Authorization", auth);
+
+        log.info("Making request {} {}", method, uri);
+        log.info("Using auth {}", auth);
+
+        return req;
+    }
+
+    public Single<Object> execute (FPHttpRequest fpr)
+    {
+        Set<URI> urls = fplus.discovery().lookup(fpr.service);
         if (urls.isEmpty())
             return Single.<Object>error(
                 new Exception("Cannot find service URL"));
 
         /* Just take the first (only) for now. */
         URI srv_base = fixPath(urls.iterator().next());
-        URI uri = srv_base.resolve(req.path);
+        log.info("Resolved {} to {}", fpr.service, srv_base);
 
-        return Single.fromCallable(() -> {
-                FPThreadUtil.logId("calling fetch");
-                return fetch(req.method, uri, req.body)
-                    .orElseThrow(() ->
-                        new Exception("fetch failed!"));
+        return tokens.get(srv_base)
+            .flatMap(tok -> {
+                FPThreadUtil.logId("creating request");
+
+                var auth = "Bearer " + tok;
+                var req = makeRequest(fpr.method, srv_base, fpr.path, auth);
+                if (fpr.body != null) {
+                    req.bodyString(fpr.body.toString(),
+                        ContentType.APPLICATION_JSON);
+                }
+                return Single.fromCallable(() -> {
+                        return fetch(req)
+                            .orElseThrow(() ->
+                                new Exception("fetch failed!"));
+                    })
+                    .subscribeOn(fplus.getScheduler());
             })
-            .subscribeOn(fplus.getScheduler());
+            .doOnSuccess(o -> FPThreadUtil.logId("execute result"));
     }
 
-    public Optional<Object> fetch (String method, URI uri, JSONObject json)
+    public Single<String> tokenFor (URI service)
+    {
+        return Single.fromCallable(() -> {
+            var name = "HTTP@" + service.getHost();
+            var tok = fplus.gssClient()
+                .createContextHB(name)
+                .flatMap(ctx -> {
+                    try {
+                        return Optional.of(ctx.initSecContext(new byte[0], 0, 0));
+                    }
+                    catch (GSSException e) {
+                        log.error("GSS error for client: {}", e.toString());
+                        return Optional.<byte[]>empty();
+                    }
+                })
+                .map(t -> Base64.getEncoder().encodeToString(t))
+                .orElseThrow(() -> new Exception("Can't get GSS token"));
+
+            var req = makeRequest("POST", service, "token",
+                "Negotiate " + tok);
+
+            return fetch(req)
+                .map(o -> (JSONObject)o)
+                .map(o -> o.getString("token"))
+                .orElseThrow(() -> 
+                    new Exception("GSSAPI fetch failed for token"));
+        })
+        .subscribeOn(fplus.getScheduler());
+    }
+
+    private Optional<Object> fetch (Request req)
     {
         try {
-            log.info("Fetch: req: {} {}", method, uri.toString());
-            Request req = Request.create(method, uri)
-                .setHeader("Authorization", service_auth);
-
-            if (json != null) {
-                req.bodyString(json.toString(), ContentType.APPLICATION_JSON);
-            }
-
             FPThreadUtil.logId("fetch called");
             Response rsp = req.execute(http_client);
             String body = rsp.returnContent().asString();
@@ -121,19 +172,6 @@ public class FPHttpClient {
         }
         catch (Exception e) {
             log.info("Fetch error: {}", e);
-            return Optional.empty();
-        }
-    }
-
-    public Optional<Object> fetch (
-        String method, URIBuilder builder, JSONObject json)
-    {
-        try {
-            URI uri = builder.build();
-            return fetch(method, uri, json);
-        }
-        catch (URISyntaxException e) {
-            log.error("Fetch for bad URI: {}", e.toString());
             return Optional.empty();
         }
     }
