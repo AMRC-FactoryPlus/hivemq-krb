@@ -42,8 +42,6 @@ public class FPServiceClient {
     private FPDiscovery _discovery;
     private FPConfigDB _configdb;
 
-    private URI configdb_service;
-
     public FPServiceClient () { 
         this(Map.<String,String>of());
     }
@@ -51,7 +49,6 @@ public class FPServiceClient {
     public FPServiceClient (Map config)
     {
         this.config = config;
-        configdb_service = getUriConf("configdb_url");
     }
 
     public String getConf (String key)
@@ -140,34 +137,6 @@ public class FPServiceClient {
         if (_configdb == null)
             _configdb = new FPConfigDB(this);
         return _configdb;
-    }
-
-    public Stream<String> configdb_list_objects (String appid)
-    {
-        URIBuilder path = new URIBuilder(configdb_service)
-            .appendPath("/v1/app")
-            .appendPath(appid)
-            .appendPath("object");
-
-        return http().fetch("GET", path, null)
-            .stream()
-            .filter(o -> o instanceof JSONArray)
-            .map(o -> (JSONArray)o)
-            .flatMap(ary -> ary.toList().stream())
-            .filter(o -> o instanceof String)
-            .map(o -> (String)o);
-    }
-
-    public Optional<JSONObject> configdb_fetch_object (String appid, String objid)
-    {
-        URIBuilder path = new URIBuilder(configdb_service)
-            .appendPath("/v1/app")
-            .appendPath(appid)
-            .appendPath("object")
-            .appendPath(objid);
-
-        return http().fetch("GET", path, null)
-            .map(o -> o instanceof JSONObject ? (JSONObject)o : null);
     }
 
     public Single<Stream<Map>> authn_acl (String princ, UUID perms)

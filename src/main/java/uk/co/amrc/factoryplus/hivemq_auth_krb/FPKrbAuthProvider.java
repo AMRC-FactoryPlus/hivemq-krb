@@ -48,7 +48,8 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
         "a637134a-d06b-41e7-ad86-4bf62fde914a");
     private static final UUID TEMPLATE_UUID = UUID.fromString(
         "1266ddf1-156c-4266-9808-d6949418b185");
-    private static final String ADDR_UUID = "8e32801b-f35a-4cbf-a5c3-2af64d3debd7";
+    private static final UUID ADDR_UUID = UUID.fromString(
+        "8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
 
     private FPServiceClient fplus;
 
@@ -108,16 +109,13 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
                     .map(tmpl -> new TemplateUse(tmpl, targid));
             })
             .flatMapStream(ace -> {
-                Callable<JSONObject> target = () -> fplus
-                    .configdb_fetch_object(ADDR_UUID, ace.target.toString())
-                    .orElseGet(() -> new JSONObject());
-
-                return ace.template
-                    .entrySet().stream()
-                    .map(e -> new MqttAce(e.getKey(), e.getValue(), target))
-                    .filter(m_ace -> m_ace.getActivity() != null)
-                    .map(m_ace -> m_ace.toTopicPermission());
+                Single<JSONObject> target = fplus.configdb()
+                    .getConfig(ADDR_UUID, ace.target);
+                return ace.template.entrySet().stream()
+                    .map(e -> MqttAce.expandEntry(e, target));
             })
+            .flatMap(Observable::fromMaybe)
+            .map(m_ace -> m_ace.toTopicPermission())
             .collect(Collectors.toList());
     }
 }
