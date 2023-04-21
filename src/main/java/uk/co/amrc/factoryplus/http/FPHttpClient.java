@@ -46,7 +46,7 @@ public class FPHttpClient {
     private FPServiceClient fplus;
     private CloseableHttpClient http_client;
     private String service_auth;
-    private TokenCache tokens;
+    private RequestCache<URI, String> tokens;
 
     public FPHttpClient (FPServiceClient fplus)
     {
@@ -65,7 +65,7 @@ public class FPHttpClient {
             .setCacheConfig(cache_config)
             .build();
 
-        tokens = new TokenCache(this::tokenFor);
+        tokens = new RequestCache<URI, String>(this::tokenFor);
     }
 
     public FPHttpRequest request (UUID service, String method)
@@ -117,7 +117,7 @@ public class FPHttpClient {
 
     public Single<String> tokenFor (URI service)
     {
-        /* This is a single huge Callable because it performs to
+        /* This is a single huge Callable because it performs two
          * sequential blocking requests. Ideally both would be
          * refactored to return Singles and they could be composed. */
         return Single.fromCallable(() -> {
@@ -166,7 +166,7 @@ public class FPHttpClient {
             return Optional.empty();
         }
         catch (Exception e) {
-            log.info("Fetch error: {}", e);
+            log.info("Fetch error: {}", e.toString());
             return Optional.empty();
         }
     }
