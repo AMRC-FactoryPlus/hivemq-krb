@@ -22,6 +22,8 @@ import org.ietf.jgss.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import org.apache.hc.client5.http.HttpResponseException;
 import org.apache.hc.client5.http.fluent.Request;
 import org.apache.hc.client5.http.fluent.Response;
@@ -71,13 +73,6 @@ public class FPHttpClient {
         return new FPHttpRequest(this, service, method);
     }
 
-    /* Java's URI class doesn't resolve relative URIs properly unless
-     * there is an explicit path component. */
-    private URI fixPath (URI uri)
-    {
-        return uri.getPath().length() == 0 ? uri.resolve("/") : uri;
-    }
-
     private Request makeRequest (String method, URI base, String path,
         String auth, String creds)
     {
@@ -94,20 +89,18 @@ public class FPHttpClient {
 
     public Single<Object> execute (FPHttpRequest fpr)
     {
-        Set<URI> urls = fplus.discovery().lookup(fpr.service);
-        if (urls.isEmpty())
-            return Single.<Object>error(
-                new Exception("Cannot find service URL"));
-
-        /* Just take the first (only) for now. */
-        URI srv_base = fixPath(urls.iterator().next());
-        log.info("Resolved {} to {}", fpr.service, srv_base);
-
-        return tokens.get(srv_base)
-            .flatMap(tok -> {
+        return fplus.discovery()
+            .get(fpr.service)
+            .flatMap(srv_base -> tokens
+                .get(srv_base)
+                .map(tok -> Pair.of(srv_base, tok)))
+            .flatMap(srv -> {
+                /* Insert Princess Bride reference here... */
+                var base = srv.getLeft();
+                var tok = srv.getRight();
                 FPThreadUtil.logId("creating request");
 
-                var req = makeRequest(fpr.method, srv_base, fpr.path, "Bearer", tok);
+                var req = makeRequest(fpr.method, base, fpr.path, "Bearer", tok);
                 if (fpr.body != null) {
                     req.bodyString(fpr.body.toString(),
                         ContentType.APPLICATION_JSON);
@@ -124,6 +117,9 @@ public class FPHttpClient {
 
     public Single<String> tokenFor (URI service)
     {
+        /* This is a single huge Callable because it performs to
+         * sequential blocking requests. Ideally both would be
+         * refactored to return Singles and they could be composed. */
         return Single.fromCallable(() -> {
             var name = "HTTP@" + service.getHost();
             var tok = fplus.gssClient()
