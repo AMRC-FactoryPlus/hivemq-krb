@@ -37,11 +37,14 @@ public class FPServiceClient {
     private Executor _executor;
     private Scheduler _scheduler;
 
+    /* I'm not sure this is the best way to do this... possibly a Map
+     * would be better? */
     private FPGssProvider _gss;
     private FPGssServer _gss_server;
     private FPGssClient _gss_client;
     private FPHttpClient _http;
     private FPDiscovery _discovery;
+    private FPAuth _auth;
     private FPConfigDB _configdb;
 
     public FPServiceClient () { 
@@ -158,6 +161,13 @@ public class FPServiceClient {
         return _discovery;
     }
 
+    synchronized public FPAuth auth ()
+    {
+        if (_auth == null)
+            _auth = new FPAuth(this);
+        return _auth;
+    }
+
     synchronized public FPConfigDB configdb ()
     {
         if (_configdb == null)
@@ -165,19 +175,5 @@ public class FPServiceClient {
         return _configdb;
     }
 
-    public Single<Stream<Map>> authn_acl (String princ, UUID perms)
-    {
-        return http().request(FPUuid.Service.Authentication, "GET")
-            .withURIBuilder(b -> b
-                .appendPath("authz/acl")
-                .setParameter("principal", princ)
-                .setParameter("permission", perms.toString()))
-            .fetch()
-            .cast(JSONArray.class)
-            .doOnSuccess(acl -> log.info("F+ ACL [{}]: {}", princ, acl))
-            .map(acl -> acl.toList().stream()
-                .filter(o -> o instanceof Map)
-                .map(o -> (Map)o));
-    }
 }
 

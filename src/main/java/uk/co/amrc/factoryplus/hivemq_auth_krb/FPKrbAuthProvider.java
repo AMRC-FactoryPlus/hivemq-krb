@@ -98,7 +98,7 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
             }
         }
 
-        return fplus.authn_acl(principal, PERMGRP_UUID)
+        return fplus.auth().getACL(principal, PERMGRP_UUID)
             .flatMapObservable(Observable::fromStream)
             .flatMapSingle(ace -> {
                 String perm = (String)ace.get("permission");
