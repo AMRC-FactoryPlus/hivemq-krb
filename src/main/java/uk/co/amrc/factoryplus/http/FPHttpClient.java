@@ -79,14 +79,15 @@ public class FPHttpClient {
     }
 
     private Request makeRequest (String method, URI base, String path,
-        String auth)
+        String auth, String creds)
     {
         URI uri = base.resolve(path);
         Request req = Request.create(method, uri)
-            .setHeader("Authorization", auth);
+            .setHeader("Authorization", auth + " " + creds);
 
         log.info("Making request {} {}", method, uri);
-        log.info("Using auth {}", auth);
+        var end = creds.length() > 5 ? 5 : creds.length();
+        log.info("Using auth {} {}...", auth, creds.substring(0, end));
 
         return req;
     }
@@ -106,8 +107,7 @@ public class FPHttpClient {
             .flatMap(tok -> {
                 FPThreadUtil.logId("creating request");
 
-                var auth = "Bearer " + tok;
-                var req = makeRequest(fpr.method, srv_base, fpr.path, auth);
+                var req = makeRequest(fpr.method, srv_base, fpr.path, "Bearer", tok);
                 if (fpr.body != null) {
                     req.bodyString(fpr.body.toString(),
                         ContentType.APPLICATION_JSON);
@@ -140,8 +140,7 @@ public class FPHttpClient {
                 .map(t -> Base64.getEncoder().encodeToString(t))
                 .orElseThrow(() -> new Exception("Can't get GSS token"));
 
-            var req = makeRequest("POST", service, "token",
-                "Negotiate " + tok);
+            var req = makeRequest("POST", service, "token", "Negotiate", tok);
 
             return fetch(req)
                 .map(o -> (JSONObject)o)
