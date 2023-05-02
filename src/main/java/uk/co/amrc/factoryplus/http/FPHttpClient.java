@@ -33,6 +33,20 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.net.URIBuilder;
 
+import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
+import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
+import org.apache.hc.client5.http.async.methods.SimpleRequestBuilder;
+import org.apache.hc.client5.http.async.methods.SimpleRequestProducer;
+import org.apache.hc.client5.http.async.methods.SimpleResponseConsumer;
+import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
+import org.apache.hc.client5.http.impl.cache.CachingHttpAsyncClients;
+import org.apache.hc.core5.concurrent.FutureCallback;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.message.StatusLine;
+import org.apache.hc.core5.io.CloseMode;
+import org.apache.hc.core5.reactor.IOReactorConfig;
+import org.apache.hc.core5.util.Timeout;
+
 import org.json.*;
 
 import io.reactivex.rxjava3.core.Single;
@@ -45,6 +59,7 @@ public class FPHttpClient {
 
     private FPServiceClient fplus;
     private CloseableHttpClient http_client;
+    private CloseableHttpAsyncClient async_client;
     private String service_auth;
     private RequestCache<URI, String> tokens;
 
@@ -66,6 +81,20 @@ public class FPHttpClient {
             .build();
 
         tokens = new RequestCache<URI, String>(this::tokenFor);
+
+        final IOReactorConfig ioReactorConfig = IOReactorConfig.custom()
+            .setSoTimeout(Timeout.ofSeconds(5))
+            .build();
+
+        async_client = CachingHttpAsyncClients.custom()
+            .setIOReactorConfig(ioReactorConfig)
+            .build();
+    }
+
+    public void start ()
+    {
+        FPThreadUtil.logId("Running async HTTP client");
+        async_client.start();
     }
 
     public FPHttpRequest request (UUID service, String method)
@@ -73,16 +102,17 @@ public class FPHttpClient {
         return new FPHttpRequest(this, service, method);
     }
 
-    private Request makeRequest (String method, URI base, String path,
+    private SimpleHttpRequest makeRequest (String method, URI base, String path,
         String auth, String creds)
     {
         URI uri = base.resolve(path);
-        Request req = Request.create(method, uri)
-            .setHeader("Authorization", auth + " " + creds);
 
         log.info("Making request {} {}", method, uri);
         var end = creds.length() > 5 ? 5 : creds.length();
         log.info("Using auth {} {}...", auth, creds.substring(0, end));
+
+        var req = new SimpleHttpRequest(method, uri);
+        req.setHeader("Authorization", auth + " " + creds);
 
         return req;
     }
@@ -102,28 +132,19 @@ public class FPHttpClient {
 
                 var req = makeRequest(fpr.method, base, fpr.path, "Bearer", tok);
                 if (fpr.body != null) {
-                    req.bodyString(fpr.body.toString(),
+                    req.setBody(fpr.body.toString(),
                         ContentType.APPLICATION_JSON);
                 }
-                return Single.fromCallable(() -> {
-                        return fetch(req)
-                            .orElseThrow(() ->
-                                new Exception("fetch failed!"));
-                    })
-                    .subscribeOn(fplus.getScheduler());
+                return fetch(req);
             })
             .doOnSuccess(o -> FPThreadUtil.logId("execute result"));
     }
 
     public Single<String> tokenFor (URI service)
     {
-        /* This is a single huge Callable because it performs two
-         * sequential blocking requests. Ideally both would be
-         * refactored to return Singles and they could be composed. */
-        return Single.fromCallable(() -> {
-            var name = "HTTP@" + service.getHost();
-            var tok = fplus.gssClient()
-                .createContextHB(name)
+        return Single.fromCallable(() -> 
+            fplus.gssClient()
+                .createContextHB("HTTP@" + service.getHost())
                 .flatMap(ctx -> {
                     try {
                         return Optional.of(ctx.initSecContext(new byte[0], 0, 0));
@@ -134,40 +155,38 @@ public class FPHttpClient {
                     }
                 })
                 .map(t -> Base64.getEncoder().encodeToString(t))
-                .orElseThrow(() -> new Exception("Can't get GSS token"));
-
-            var req = makeRequest("POST", service, "token", "Negotiate", tok);
-
-            return fetch(req)
-                .map(o -> (JSONObject)o)
-                .map(o -> o.getString("token"))
-                .orElseThrow(() -> 
-                    new Exception("GSSAPI fetch failed for token"));
-        })
-        .subscribeOn(fplus.getScheduler());
+                .orElseThrow(() -> new Exception("Can't get GSS token")))
+            .map(tok -> makeRequest("POST", service, "token", "Negotiate", tok))
+            .flatMap(req -> fetch(req))
+            .map(o -> (JSONObject)o)
+            .map(o -> o.getString("token"));
     }
 
-    private Optional<Object> fetch (Request req)
+    private Single<Object> fetch (SimpleHttpRequest req)
     {
-        try {
-            FPThreadUtil.logId("fetch called");
-            Response rsp = req.execute(http_client);
-            String body = rsp.returnContent().asString();
-            //log.info("Fetch: rsp: {}", body);
-            
-            if (body == null) return Optional.empty();
-            return Optional.of(
-                new JSONTokener(body).nextValue());
-        }
-        catch (HttpResponseException e) {
-            int st = e.getStatusCode();
-            if (st != 404)
-                log.error("Fetch HTTP error: {}", st);
-            return Optional.empty();
-        }
-        catch (Exception e) {
-            log.info("Fetch error: {}", e.toString());
-            return Optional.empty();
-        }
+        FPThreadUtil.logId("fetch called");
+        return Single.<SimpleHttpResponse>create(obs ->
+                async_client.execute(req,
+                    new FutureCallback<SimpleHttpResponse>() {
+                        public void completed (SimpleHttpResponse res) {
+                            FPThreadUtil.logId("fetch success");
+                            obs.onSuccess(res);
+                        }
+
+                        public void failed (Exception ex) {
+                            FPThreadUtil.logId("fetch failure");
+                            obs.onError(ex);
+                        }
+
+                        public void cancelled () {
+                            obs.onError(new Exception("HTTP future cancelled"));
+                        }
+                    }))
+            .doOnSuccess(res -> {
+                FPThreadUtil.logId("handling fetch response");
+                log.info("Fetch response {}: {}", req.getUri(), res.getCode());
+            })
+            .map(res -> res.getBodyText())
+            .map(json -> new JSONTokener(json).nextValue());
     }
 }
