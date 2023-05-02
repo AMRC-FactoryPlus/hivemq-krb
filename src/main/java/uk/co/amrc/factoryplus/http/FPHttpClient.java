@@ -119,6 +119,7 @@ public class FPHttpClient {
 
     public Single<Object> execute (FPHttpRequest fpr)
     {
+        FPThreadUtil.logId("execute called");
         return fplus.discovery()
             .get(fpr.service)
             .flatMap(srv_base -> tokens
@@ -142,23 +143,22 @@ public class FPHttpClient {
 
     public Single<String> tokenFor (URI service)
     {
-        return Single.fromCallable(() -> 
-            fplus.gssClient()
-                .createContextHB("HTTP@" + service.getHost())
-                .flatMap(ctx -> {
-                    try {
-                        return Optional.of(ctx.initSecContext(new byte[0], 0, 0));
-                    }
-                    catch (GSSException e) {
-                        log.error("GSS error for client: {}", e.toString());
-                        return Optional.<byte[]>empty();
-                    }
-                })
-                .map(t -> Base64.getEncoder().encodeToString(t))
-                .orElseThrow(() -> new Exception("Can't get GSS token")))
+        return Single.fromCallable(() -> {
+                FPThreadUtil.logId("getting gss context");
+                return fplus.gssClient()
+                    .createContextHB("HTTP@" + service.getHost())
+                    .orElseThrow(() -> new Exception("Can't get GSS context"));
+            })
+            .map(ctx -> {
+                FPThreadUtil.logId("getting gss token");
+                return ctx.initSecContext(new byte[0], 0, 0);
+            })
+            .map(tok -> Base64.getEncoder().encodeToString(tok))
             .map(tok -> makeRequest("POST", service, "token", "Negotiate", tok))
+            .subscribeOn(fplus.getScheduler())
             .flatMap(req -> fetch(req))
-            .map(o -> (JSONObject)o)
+            /* fetch moves calls below here to the http thread pool */
+            .cast(JSONObject.class)
             .map(o -> o.getString("token"));
     }
 
