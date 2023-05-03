@@ -106,7 +106,7 @@ public class FPHttpClient {
         return discovery
             .get(fpr.service)
             .flatMap(base -> tokens.get(base)
-                .map(tok -> fpr.resolveWith(base, "Bearer", tok)))
+                .map(tok -> fpr.resolveWith(base, tok)))
             .flatMap(rrq -> fetch(rrq.buildRequest())
                 .flatMap(res -> rrq.handleResponse(res)))
             .retry(2, ex -> 
@@ -118,20 +118,15 @@ public class FPHttpClient {
     {
         return Single.fromCallable(() -> {
                 FPThreadUtil.logId("getting gss context");
+                /* blocking */
                 return fplus.gssClient()
                     .createContextHB("HTTP@" + service.getHost())
                     .orElseThrow(() -> new Exception("Can't get GSS context"));
             })
-            .map(ctx -> {
-                FPThreadUtil.logId("getting gss token");
-                return ctx.initSecContext(new byte[0], 0, 0);
-            })
-            .map(tok -> Base64.getEncoder().encodeToString(tok))
-            .map(tok -> request(null, "POST")
-                .withPath("/token")
-                .resolveWith(service, "Negotiate", tok)
-                .buildRequest())
-            .flatMap(req -> fetch(req))
+            .map(ctx -> new TokenRequest(service, ctx))
+                /* buildRequest is blocking */
+            .flatMap(req -> fetch(req.buildRequest())
+                .flatMap(res -> req.handleResponse(res)))
             .subscribeOn(fplus.getScheduler())
             /* fetch moves calls below here to the http thread pool */
             .map(res -> res.ifOk()

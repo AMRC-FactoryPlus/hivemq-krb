@@ -22,15 +22,12 @@ class ResolvedRequest
 
     private FPHttpRequest source;
     private URI base;
-    private String auth;
     private String token;
 
-    public ResolvedRequest (FPHttpRequest source, URI base,
-        String auth, String token)
+    public ResolvedRequest (FPHttpRequest source, URI base, String token)
     {
         this.source = source;
         this.base = base;
-        this.auth = auth;
         this.token = token;
     }
 
@@ -40,10 +37,10 @@ class ResolvedRequest
 
         log.info("Making request {} {}", source.method, uri);
         var end = token.length() > 5 ? 5 : token.length();
-        log.info("Using auth {} {}...", auth, token.substring(0, end));
+        log.info("Using bearer auth {}...", token.substring(0, end));
 
         var req = new SimpleHttpRequest(source.method, uri);
-        req.setHeader("Authorization", auth + " " + token);
+        req.setHeader("Authorization", "Bearer " + token);
 
         if (source.body != null)
             req.setBody(source.body.toString(), ContentType.APPLICATION_JSON);
@@ -53,13 +50,8 @@ class ResolvedRequest
 
     public Single<JsonResponse> handleResponse (JsonResponse res)
     {
-        switch (auth) {
-        case "Bearer":
-            return res.getCode() == 401
-                ? Single.error(() -> new BadToken(base, token))
-                : Single.just(res);
-        default:
-            return Single.just(res);
-        }
+        return res.getCode() == 401
+            ? Single.error(() -> new BadToken(base, token))
+            : Single.just(res);
     }
 }

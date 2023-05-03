@@ -49,9 +49,9 @@ public class FPHttpRequest {
         return this;
     }
 
-    public ResolvedRequest resolveWith (URI base, String auth, String token)
+    public ResolvedRequest resolveWith (URI base, String token)
     {
-        return new ResolvedRequest(this, base, auth, token);
+        return new ResolvedRequest(this, base, token);
     }
 
     public Single<JsonResponse> fetch ()
