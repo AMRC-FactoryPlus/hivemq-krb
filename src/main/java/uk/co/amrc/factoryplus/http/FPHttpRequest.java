@@ -5,6 +5,7 @@
 
 package uk.co.amrc.factoryplus.http;
 
+import java.net.URI;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
@@ -14,8 +15,8 @@ import org.json.JSONObject;
 import io.reactivex.rxjava3.core.Single;
 
 public class FPHttpRequest {
-    /* These are package-scoped; FPHttpClient wants 'friend' access. */
-    FPHttpClient client;
+    /* XXX ResolvedRequest needs friend access */
+    private FPHttpClient client;
     UUID service;
     String method;
     String path;
@@ -46,6 +47,11 @@ public class FPHttpRequest {
     {
         this.body = body;
         return this;
+    }
+
+    public ResolvedRequest resolveWith (URI base, String auth, String token)
+    {
+        return new ResolvedRequest(this, base, auth, token);
     }
 
     public Single<JsonResponse> fetch ()

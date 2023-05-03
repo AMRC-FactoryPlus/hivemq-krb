@@ -63,6 +63,7 @@ public class FPHttpClient {
     private CloseableHttpAsyncClient async_client;
     private RequestCache<URI, String> tokens;
 
+
     public FPHttpClient (FPServiceClient fplus)
     {
         this.fplus = fplus;
@@ -99,43 +100,18 @@ public class FPHttpClient {
         return new FPHttpRequest(this, service, method);
     }
 
-    private SimpleHttpRequest makeRequest (String method, URI base, String path,
-        String auth, String creds)
-    {
-        URI uri = base.resolve(path);
-
-        log.info("Making request {} {}", method, uri);
-        var end = creds.length() > 5 ? 5 : creds.length();
-        log.info("Using auth {} {}...", auth, creds.substring(0, end));
-
-        var req = new SimpleHttpRequest(method, uri);
-        req.setHeader("Authorization", auth + " " + creds);
-
-        return req;
-    }
-
     public Single<JsonResponse> execute (FPHttpRequest fpr)
     {
         FPThreadUtil.logId("execute called");
         return discovery
             .get(fpr.service)
-            .flatMap(srv_base -> tokens
-                .get(srv_base)
-                .map(tok -> Pair.of(srv_base, tok)))
-            .flatMap(srv -> {
-                /* Insert Princess Bride reference here... */
-                var base = srv.getLeft();
-                var tok = srv.getRight();
-                FPThreadUtil.logId("creating request");
-
-                var req = makeRequest(fpr.method, base, fpr.path, "Bearer", tok);
-                if (fpr.body != null) {
-                    req.setBody(fpr.body.toString(),
-                        ContentType.APPLICATION_JSON);
-                }
-                return fetch(req);
-            })
-            .doOnSuccess(o -> FPThreadUtil.logId("execute result"));
+            .flatMap(base -> tokens.get(base)
+                .map(tok -> fpr.resolveWith(base, "Bearer", tok)))
+            .flatMap(rrq -> fetch(rrq.buildRequest())
+                .flatMap(res -> rrq.handleResponse(res)))
+            .retry(2, ex -> 
+                (ex instanceof BadToken)
+                    && ((BadToken)ex).invalidate(tokens));
     }
 
     public Single<String> tokenFor (URI service)
@@ -151,9 +127,12 @@ public class FPHttpClient {
                 return ctx.initSecContext(new byte[0], 0, 0);
             })
             .map(tok -> Base64.getEncoder().encodeToString(tok))
-            .map(tok -> makeRequest("POST", service, "token", "Negotiate", tok))
-            .subscribeOn(fplus.getScheduler())
+            .map(tok -> request(null, "POST")
+                .withPath("/token")
+                .resolveWith(service, "Negotiate", tok)
+                .buildRequest())
             .flatMap(req -> fetch(req))
+            .subscribeOn(fplus.getScheduler())
             /* fetch moves calls below here to the http thread pool */
             .map(res -> res.ifOk()
                 .flatMap(r -> r.getBodyObject())
