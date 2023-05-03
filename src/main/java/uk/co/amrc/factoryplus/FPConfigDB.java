@@ -52,6 +52,9 @@ public class FPConfigDB {
                 .appendPath("object")
                 .appendPath(objid.toString()))
             .fetch()
-            .cast(JSONObject.class);
+            .map(res -> res.ifOk()
+                .flatMap(r -> r.getBodyObject())
+                .orElseThrow(() ->
+                    new Exception("ConfigDB entry not an object")));
     }
 }

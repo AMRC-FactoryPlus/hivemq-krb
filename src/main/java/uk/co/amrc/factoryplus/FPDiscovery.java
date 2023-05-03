@@ -57,7 +57,13 @@ public class FPDiscovery {
                 .appendPath(service.toString())
             )
             .fetch()
-            .doOnSuccess(o -> log.info("Service resp: {}", o))
+            .map(res -> res.ifOk()
+                .flatMap(r -> r.getBody())
+                .orElseGet(() -> {
+                    log.error("Can't find {} via the Directory: {}",
+                        service, res.getCode());
+                    return new JSONArray();
+                }))
             .cast(JSONArray.class)
             .flatMapObservable(Observable::fromIterable)
             .doOnNext(o -> log.info("Service URL: {}", o))

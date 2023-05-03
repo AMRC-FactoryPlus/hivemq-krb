@@ -114,10 +114,10 @@ public class FPHttpClient {
         return req;
     }
 
-    public Single<Object> execute (FPHttpRequest fpr)
+    public Single<JsonResponse> execute (FPHttpRequest fpr)
     {
         FPThreadUtil.logId("execute called");
-        return fplus.discovery()
+        return discovery
             .get(fpr.service)
             .flatMap(srv_base -> tokens
                 .get(srv_base)
@@ -155,11 +155,13 @@ public class FPHttpClient {
             .subscribeOn(fplus.getScheduler())
             .flatMap(req -> fetch(req))
             /* fetch moves calls below here to the http thread pool */
-            .cast(JSONObject.class)
+            .map(res -> res.ifOk()
+                .flatMap(r -> r.getBodyObject())
+                .orElseThrow(() -> new Exception("Invalid token response")))
             .map(o -> o.getString("token"));
     }
 
-    private Single<Object> fetch (SimpleHttpRequest req)
+    private Single<JsonResponse> fetch (SimpleHttpRequest req)
     {
         FPThreadUtil.logId("fetch called");
         return Single.<SimpleHttpResponse>create(obs ->
@@ -183,7 +185,6 @@ public class FPHttpClient {
                 FPThreadUtil.logId("handling fetch response");
                 log.info("Fetch response {}: {}", req.getUri(), res.getCode());
             })
-            .map(res -> res.getBodyText())
-            .map(json -> new JSONTokener(json).nextValue());
+            .map(res -> new JsonResponse(res));
     }
 }

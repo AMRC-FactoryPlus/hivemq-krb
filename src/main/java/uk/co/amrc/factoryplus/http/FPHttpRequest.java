@@ -48,7 +48,7 @@ public class FPHttpRequest {
         return this;
     }
 
-    public Single<Object> fetch ()
+    public Single<JsonResponse> fetch ()
     {
         return client.execute(this);
     }
