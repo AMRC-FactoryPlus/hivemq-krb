@@ -91,7 +91,7 @@ public class FPHttpClient {
         /* This can throw if the directory url is missing */
         this.discovery = fplus.discovery();
 
-        FPThreadUtil.logId("Running async HTTP client");
+        //FPThreadUtil.logId("Running async HTTP client");
         async_client.start();
     }
 
@@ -102,7 +102,7 @@ public class FPHttpClient {
 
     public Single<JsonResponse> execute (FPHttpRequest fpr)
     {
-        FPThreadUtil.logId("execute called");
+        //FPThreadUtil.logId("execute called");
         return discovery
             .get(fpr.service)
             .flatMap(base -> tokens.get(base)
@@ -117,7 +117,7 @@ public class FPHttpClient {
     public Single<String> tokenFor (URI service)
     {
         return Single.fromCallable(() -> {
-                FPThreadUtil.logId("getting gss context");
+                //FPThreadUtil.logId("getting gss context");
                 /* blocking */
                 return fplus.gssClient()
                     .createContextHB("HTTP@" + service.getHost())
@@ -137,17 +137,17 @@ public class FPHttpClient {
 
     private Single<JsonResponse> fetch (SimpleHttpRequest req)
     {
-        FPThreadUtil.logId("fetch called");
+        //FPThreadUtil.logId("fetch called");
         return Single.<SimpleHttpResponse>create(obs ->
                 async_client.execute(req,
                     new FutureCallback<SimpleHttpResponse>() {
                         public void completed (SimpleHttpResponse res) {
-                            FPThreadUtil.logId("fetch success");
+                            //FPThreadUtil.logId("fetch success");
                             obs.onSuccess(res);
                         }
 
                         public void failed (Exception ex) {
-                            FPThreadUtil.logId("fetch failure");
+                            //FPThreadUtil.logId("fetch failure");
                             obs.onError(ex);
                         }
 
@@ -155,10 +155,10 @@ public class FPHttpClient {
                             obs.onError(new Exception("HTTP future cancelled"));
                         }
                     }))
-            .doOnSuccess(res -> {
-                FPThreadUtil.logId("handling fetch response");
-                log.info("Fetch response {}: {}", req.getUri(), res.getCode());
-            })
+            //.doOnSuccess(res -> {
+            //    FPThreadUtil.logId("handling fetch response");
+            //    log.info("Fetch response {}: {}", req.getUri(), res.getCode());
+            //})
             .map(res -> new JsonResponse(res));
     }
 }

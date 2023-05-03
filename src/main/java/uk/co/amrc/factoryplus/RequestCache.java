@@ -42,11 +42,11 @@ public class RequestCache<Key, Value>
 
         return inFlight.computeIfAbsent(key, k -> {
             var promise = source.apply(key).cache();
-            log.info("In-flight: add {} {}", key, promise);
+            //log.info("In-flight: add {} {}", key, promise);
 
             promise
                 .doAfterTerminate(() -> {
-                    log.info("In-flight: remove {} {}", key, promise);
+                    //log.info("In-flight: remove {} {}", key, promise);
                     inFlight.remove(key, promise);
                 })
                 .subscribe(rv -> cache.put(key, rv), e -> {});

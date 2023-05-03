@@ -84,8 +84,8 @@ class MqttAce {
             .map(target -> 
                 interp.replaceAll(match -> expandTemplate(match, target)))
             .map(tp -> new MqttAce(tp, activity))
-            .doOnError(e -> log.error("Topic interpolation failed: {}",
-                e.toString()))
+            //.doOnError(e -> log.error("Topic interpolation failed: {}",
+            //    e.toString()))
             .onErrorComplete();
     }
 

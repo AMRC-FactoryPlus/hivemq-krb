@@ -66,7 +66,7 @@ public class FPDiscovery {
                 }))
             .cast(JSONArray.class)
             .flatMapObservable(Observable::fromIterable)
-            .doOnNext(o -> log.info("Service URL: {}", o))
+            //.doOnNext(o -> log.info("Service URL: {}", o))
             .cast(JSONObject.class)
             .map(o -> o.getString("url"))
             .map(URI::new)
@@ -80,8 +80,8 @@ public class FPDiscovery {
                 ? Single.<Set<URI>>error(new Exception("Cannot find service URL"))
                 : Single.just(urls))
             /* Just take the first (only) for now. */
-            .map(urls -> fixPath(urls.iterator().next()))
-            .doOnSuccess(base -> log.info("Resolved {} to {}", service, base));
+            .map(urls -> fixPath(urls.iterator().next()));
+            //.doOnSuccess(base -> log.info("Resolved {} to {}", service, base));
     }
 
     public void remove (UUID service, URI bad)

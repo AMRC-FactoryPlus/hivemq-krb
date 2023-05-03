@@ -43,13 +43,13 @@ class TokenRequest
     public SimpleHttpRequest buildRequest ()
         throws GSSException
     {
-        FPThreadUtil.logId("getting gss token");
+        //FPThreadUtil.logId("getting gss token");
         /* blocking */
         var tok = ctx.initSecContext(new byte[0], 0, 0);
         var creds = Base64.getEncoder().encodeToString(tok);
         var uri = server.resolve("/token");
 
-        log.info("Making GSS token request to {}", uri);
+        //log.info("Making GSS token request to {}", uri);
 
         var req = new SimpleHttpRequest("POST", uri);
         req.setHeader("Authorization", "Negotiate " + creds);
@@ -85,7 +85,7 @@ class TokenRequest
         if (!ctx.isEstablished())
             return mkerr("Cannot establish server's identity");
 
-        log.info("Accepted GSS response from {}", ctx.getTargName());
+        //log.info("Accepted GSS response from {}", ctx.getTargName());
         ctx.dispose();
 
         return Single.just(res);

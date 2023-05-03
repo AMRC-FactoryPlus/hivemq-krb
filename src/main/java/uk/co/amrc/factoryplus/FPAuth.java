@@ -40,7 +40,7 @@ public class FPAuth {
 
     public Single<Stream<Map>> getACL (String princ, UUID perms)
     {
-        FPThreadUtil.logId("fetching acl");
+        //FPThreadUtil.logId("fetching acl");
         return fplus.http().request(SERVICE, "GET")
             .withURIBuilder(b -> b
                 .appendPath("authz/acl")

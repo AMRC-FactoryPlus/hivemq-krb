@@ -25,7 +25,7 @@ public class JsonResponse
     public JsonResponse (SimpleHttpResponse res)
     {
         response = res;
-        log.info("Parsing JSON response: {}", res.getCode());
+        //log.info("Parsing JSON response: {}", res.getCode());
 
         body = Optional.ofNullable(res.getBodyText())
             .filter(s -> !s.isEmpty())
