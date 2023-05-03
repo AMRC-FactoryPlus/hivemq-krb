@@ -33,7 +33,9 @@ public class FPDiscovery {
         this.fplus = fplus;
         this.cache = new RequestCache<UUID, Set<URI>>(this::_lookup);
 
-        setServiceURL(SERVICE, fplus.getUriConf("directory_url"));
+        var url = fplus.getUriConf("directory_url");
+        log.info("Using Directory {}", url);
+        setServiceURL(SERVICE, url);
     }
 
     public void setServiceURL (UUID service, URI url)
@@ -48,6 +50,7 @@ public class FPDiscovery {
 
     private Single<Set<URI>> _lookup (UUID service)
     {
+        log.info("Looking up {} via the Directory", service);
         return fplus.http().request(SERVICE, "GET")
             .withURIBuilder(b -> b
                 .appendPath("v1/service")

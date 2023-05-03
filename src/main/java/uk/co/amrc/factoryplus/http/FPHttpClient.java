@@ -58,20 +58,14 @@ public class FPHttpClient {
     private static final Logger log = LoggerFactory.getLogger(FPHttpClient.class);
 
     private FPServiceClient fplus;
+    private FPDiscovery discovery;
     private CloseableHttpClient http_client;
     private CloseableHttpAsyncClient async_client;
-    private String service_auth;
     private RequestCache<URI, String> tokens;
 
     public FPHttpClient (FPServiceClient fplus)
     {
         this.fplus = fplus;
-
-        String srv_user = fplus.getConf("service_username");
-        String srv_pass = fplus.getConf("service_password");
-        service_auth = "Basic " 
-            + Base64.getEncoder().encodeToString(
-                (srv_user + ":" + srv_pass).getBytes());
 
         CacheConfig cache_config = CacheConfig.custom()
             .setSharedCache(false)
@@ -93,6 +87,9 @@ public class FPHttpClient {
 
     public void start ()
     {
+        /* This can throw if the directory url is missing */
+        this.discovery = fplus.discovery();
+
         FPThreadUtil.logId("Running async HTTP client");
         async_client.start();
     }
