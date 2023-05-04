@@ -44,6 +44,7 @@ public class FPServiceClient {
     private FPGssClient _gss_client;
     private FPHttpClient _http;
     private FPDiscovery _discovery;
+    private FPDirectory _directory;
     private FPAuth _auth;
     private FPConfigDB _configdb;
 
@@ -159,6 +160,13 @@ public class FPServiceClient {
         if (_discovery == null)
             _discovery = new FPDiscovery(this);
         return _discovery;
+    }
+
+    synchronized public FPDirectory directory ()
+    {
+        if (_directory == null)
+            _directory = new FPDirectory(this);
+        return _directory;
     }
 
     synchronized public FPAuth auth ()

@@ -21,21 +21,26 @@ import io.reactivex.rxjava3.core.*;
 
 import uk.co.amrc.factoryplus.http.*;
 
+/* XXX The JS client performs a (cached) fetch every time, with a Map of
+ * overrides. This client caches the responses from the Directory
+ * indefinitely, which is definitely incorrect. However, we perform
+ * not-entirely-trivial processing on the response, so even if there
+ * will be no network activity I would like to know that I got a 304 and
+ * can reuse the existing derived value... */
+
 public class FPDiscovery {
     private static final Logger log = LoggerFactory.getLogger(FPDiscovery.class);
-    private static final UUID SERVICE = FPUuid.Service.Directory;
 
-    private FPServiceClient fplus;
     private RequestCache<UUID, Set<URI>> cache;
 
     public FPDiscovery (FPServiceClient fplus)
     {
-        this.fplus = fplus;
-        this.cache = new RequestCache<UUID, Set<URI>>(this::_lookup);
+        var dir = fplus.directory();
+        this.cache = new RequestCache<UUID, Set<URI>>(dir::getServiceURLs);
 
         var url = fplus.getUriConf("directory_url");
         log.info("Using Directory {}", url);
-        setServiceURL(SERVICE, url);
+        setServiceURL(FPUuid.Service.Directory, url);
     }
 
     public void setServiceURL (UUID service, URI url)
@@ -46,31 +51,6 @@ public class FPDiscovery {
     public Single<Set<URI>> lookup (UUID service)
     {
         return cache.get(service);
-    }
-
-    private Single<Set<URI>> _lookup (UUID service)
-    {
-        log.info("Looking up {} via the Directory", service);
-        return fplus.http().request(SERVICE, "GET")
-            .withURIBuilder(b -> b
-                .appendPath("v1/service")
-                .appendPath(service.toString())
-            )
-            .fetch()
-            .map(res -> res.ifOk()
-                .flatMap(r -> r.getBody())
-                .orElseGet(() -> {
-                    log.error("Can't find {} via the Directory: {}",
-                        service, res.getCode());
-                    return new JSONArray();
-                }))
-            .cast(JSONArray.class)
-            .flatMapObservable(Observable::fromIterable)
-            //.doOnNext(o -> log.info("Service URL: {}", o))
-            .cast(JSONObject.class)
-            .map(o -> o.getString("url"))
-            .map(URI::new)
-            .collect(Collectors.toUnmodifiableSet());
     }
 
     public Single<URI> get (UUID service)
