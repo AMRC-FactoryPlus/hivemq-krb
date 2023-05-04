@@ -38,6 +38,7 @@ import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
 import org.apache.hc.client5.http.async.methods.SimpleRequestBuilder;
 import org.apache.hc.client5.http.async.methods.SimpleRequestProducer;
 import org.apache.hc.client5.http.async.methods.SimpleResponseConsumer;
+import org.apache.hc.client5.http.cache.HttpCacheContext;
 import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
 import org.apache.hc.client5.http.impl.cache.CachingHttpAsyncClients;
 import org.apache.hc.core5.concurrent.FutureCallback;
@@ -138,11 +139,13 @@ public class FPHttpClient {
     private Single<JsonResponse> fetch (SimpleHttpRequest req)
     {
         //FPThreadUtil.logId("fetch called");
+        //final var context = HttpCacheContext.create();
         return Single.<SimpleHttpResponse>create(obs ->
-                async_client.execute(req,
+                async_client.execute(req, //context,
                     new FutureCallback<SimpleHttpResponse>() {
                         public void completed (SimpleHttpResponse res) {
                             //FPThreadUtil.logId("fetch success");
+                            //context.getCacheResponseStatus(),
                             obs.onSuccess(res);
                         }
 
