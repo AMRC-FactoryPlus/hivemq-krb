@@ -44,6 +44,7 @@ import com.hivemq.extension.sdk.api.services.builder.Builders;
 public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
 {
     private static final Logger log = LoggerFactory.getLogger(FPKrbAuth.class);
+
     private static final UUID PERMGRP_UUID = UUID.fromString(
         "a637134a-d06b-41e7-ad86-4bf62fde914a");
     private static final UUID TEMPLATE_UUID = UUID.fromString(
@@ -61,6 +62,14 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
     public FPKrbAuthProvider start ()
     {
         fplus.http().start();
+
+         var url = fplus.getUriConf("mqtt_url");
+
+        fplus.directory()
+            .registerServiceURL(FPUuid.Service.MQTT, url)
+            .subscribe(() -> log.info("Registered service successfully"),
+                e -> log.error("Failed to register service: {}", 
+                    e.toString()));
 
         return this;
     }

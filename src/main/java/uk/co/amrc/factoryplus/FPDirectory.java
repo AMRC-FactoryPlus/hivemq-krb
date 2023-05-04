@@ -55,4 +55,23 @@ public class FPDirectory {
             .map(URI::new)
             .collect(Collectors.toUnmodifiableSet());
     }
+
+    public Completable registerServiceURL (UUID service, URI url)
+    {
+        log.info("Registering {} with the Directory for service {}",
+            url, service);
+        return fplus.http().request(SERVICE, "PUT")
+            .withURIBuilder(b -> b
+                .appendPath("v1/service")
+                .appendPath(service.toString())
+                .appendPath("advertisment"))
+            .withBody(new JSONObject()
+                .put("url", url.toString()))
+            .fetch()
+            .flatMapCompletable(res ->
+                res.ok() ? Completable.complete()
+                : Completable.error(() ->
+                    new Exception("Service registration error: " 
+                        + res.getCode())));
+    }
 }
