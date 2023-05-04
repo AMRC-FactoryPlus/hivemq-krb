@@ -76,7 +76,7 @@ public class FPGssProvider {
     {
         Configuration config = new KrbConfiguration();
         CallbackHandler cb = new NullCallbackHandler();
-        return buildSubject("client-keytab", cb, config);
+        return buildSubject("client-ccache", cb, config);
     }
 
     public Optional<Subject> buildClientSubjectWithPassword (

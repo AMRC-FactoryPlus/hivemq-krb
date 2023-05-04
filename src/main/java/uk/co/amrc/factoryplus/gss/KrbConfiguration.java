@@ -46,7 +46,7 @@ class KrbConfiguration extends Configuration {
 
         case "client-ccache":
             opts.put("doNotPrompt", "true");
-            opts.put("storeKey", "true");
+            opts.put("storeKey", "false");
             opts.put("isInitiator", "true");
             opts.put("useTicketCache", "true");
             break;
