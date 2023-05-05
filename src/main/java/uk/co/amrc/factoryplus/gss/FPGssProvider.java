@@ -26,12 +26,19 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
+import uk.co.amrc.factoryplus.FPServiceClient;
+
+/** Wrapper around the  Java GSSAPI.
+ *
+ * This class simplifies some common operations.
+ */
 public class FPGssProvider {
     private static final Logger log = LoggerFactory.getLogger(FPGssProvider.class);
 
     GSSManager gss_manager;
     Oid _krb5Mech, _krb5PrincipalNT;
 
+    /** Internal; construct via {@link FPServiceClient}. */
     public FPGssProvider ()
     {
         try {
@@ -87,18 +94,42 @@ public class FPGssProvider {
         return buildSubject("client-password", cb, config);
     }
 
+    /** Builds server (acceptor) credentials.
+     *
+     * The <code>FPGssServer</code> returned from this method will
+     * accept GSS client requests directed to any key given in the
+     * keytab. The provided SPN is just for information.
+     *
+     * @param principal The Kerberos principal name to use.
+     * @param keytab The path to a keytab file.
+     * @return The server credentials.
+     */
     public Optional<FPGssServer> server (String principal, String keytab)
     {
         return buildServerSubject(keytab, "*")
             .map(subj -> new FPGssServer(this, principal, subj));
     }
 
+    /** Builds client (initiator) creds from a ccache.
+     *
+     * This assumes a ccache is available in the default location.
+     *
+     * @return The client credentials.
+     */
     public Optional<FPGssClient> clientWithCcache ()
     {
         return buildClientSubjectWithCcache()
             .map(subj -> new FPGssClient(this, subj));
     }
 
+    /** Build client creds from username and password.
+     *
+     * This performs a new Kerberos login.
+     *
+     * @param username The username to use.
+     * @param password The password.
+     * @return The client credentials.
+     */
     public Optional<FPGssClient> clientWithPassword (
         String username, char[] password)
     {

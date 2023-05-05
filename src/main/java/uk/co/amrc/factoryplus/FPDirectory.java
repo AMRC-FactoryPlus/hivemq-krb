@@ -20,6 +20,8 @@ import io.reactivex.rxjava3.core.*;
 
 import uk.co.amrc.factoryplus.http.*;
 
+/** The Directory service.
+ */
 public class FPDirectory {
     private static final Logger log = LoggerFactory.getLogger(FPDirectory.class);
     private static final UUID SERVICE = FPUuid.Service.Directory;
@@ -31,6 +33,15 @@ public class FPDirectory {
         this.fplus = fplus;
     }
 
+    /** Fetches the URLs published for a given service.
+     *
+     * Fetches a Set of URIs published by the providers of the given
+     * service. Currently selection of a URL from the returned Set is up
+     * to the client.
+     *
+     * @param service The Service UUID.
+     * @return A Set of the published URLs.
+     */
     public Single<Set<URI>> getServiceURLs (UUID service)
     {
         log.info("Looking up {} via the Directory", service);
@@ -56,6 +67,15 @@ public class FPDirectory {
             .collect(Collectors.toUnmodifiableSet());
     }
 
+    /** Register a service URL with the Directory.
+     *
+     * Register ourselves as providing a service at the given URL. This
+     * registration will be owned by the current user.
+     *
+     * @param service The Service UUID.
+     * @param url The service URL.
+     * @return A Completable indicating success or failure.
+     */
     public Completable registerServiceURL (UUID service, URI url)
     {
         log.info("Registering {} with the Directory for service {}",

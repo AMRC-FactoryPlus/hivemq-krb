@@ -19,6 +19,7 @@ import org.json.JSONObject;
 
 import io.reactivex.rxjava3.core.Single;
 
+/** Internal. */
 public class RequestCache<Key, Value>
 {
     private static final Logger log = LoggerFactory.getLogger(RequestCache.class);

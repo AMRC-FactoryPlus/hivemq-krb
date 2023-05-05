@@ -55,6 +55,8 @@ import io.reactivex.rxjava3.core.Single;
 import uk.co.amrc.factoryplus.*;
 import uk.co.amrc.factoryplus.gss.*;
 
+/** HTTP (REST) client.
+ */
 public class FPHttpClient {
     private static final Logger log = LoggerFactory.getLogger(FPHttpClient.class);
 
@@ -64,7 +66,7 @@ public class FPHttpClient {
     private CloseableHttpAsyncClient async_client;
     private RequestCache<URI, String> tokens;
 
-
+    /** Internal; construct via {@link FPServiceClient}. */
     public FPHttpClient (FPServiceClient fplus)
     {
         this.fplus = fplus;
@@ -87,6 +89,13 @@ public class FPHttpClient {
             .build();
     }
 
+    /** Start the async client threads.
+     *
+     * Call this before calling any other methods.
+     *
+     * @throws ServiceConfigurationError
+     *  If the <code>directory_url</code> config param is missing.
+     */
     public void start ()
     {
         /* This can throw if the directory url is missing */
@@ -96,11 +105,18 @@ public class FPHttpClient {
         async_client.start();
     }
 
+    /** Creates a new request.
+     *
+     * @param service The service this request is directed at.
+     * @param method The HTTP method to use.
+     * @return A new request.
+     */
     public FPHttpRequest request (UUID service, String method)
     {
         return new FPHttpRequest(this, service, method);
     }
 
+    /** Internal; use {@link FPHttpRequest#fetch()}. */
     public Single<JsonResponse> execute (FPHttpRequest fpr)
     {
         //FPThreadUtil.logId("execute called");
@@ -115,6 +131,7 @@ public class FPHttpClient {
                     && ((BadToken)ex).invalidate(tokens));
     }
 
+    /** Internal */
     public Single<String> tokenFor (URI service)
     {
         return Single.fromCallable(() -> {

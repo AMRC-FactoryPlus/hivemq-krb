@@ -7,6 +7,8 @@ package uk.co.amrc.factoryplus;
 
 import java.util.UUID;
 
+/** Static well-known UUIDs.
+ */
 public class FPUuid {
     static final UUID FactoryPlus = UUID.fromString("11ad7b32-1d32-4c4a-b0c9-fa049208939a");
     static final UUID Null = UUID.fromString("00000000-0000-0000-0000-000000000000");

@@ -32,6 +32,7 @@ public class FPGssServer extends FPGssPrincipal {
     String principal;
     private GSSCredential creds;
 
+    /** Internal; construct via {@link FPGssProvider}. */
     public FPGssServer (FPGssProvider provider, String principal, Subject subject)
     {
         super(provider, subject);
@@ -40,6 +41,12 @@ public class FPGssServer extends FPGssPrincipal {
 
     public String getPrincipal () { return principal; }
 
+    /** Fetches our credentials.
+     *
+     * This method verifies we can read the supplied keytab.
+     *
+     * @return This, iff successful.
+     */
     public Optional<FPGssServer> login ()
     {
         return withSubject("getting creds from keytab", () -> {
@@ -56,6 +63,10 @@ public class FPGssServer extends FPGssPrincipal {
         });
     }
 
+    /** Creates a GSS context.
+     *
+     * @return A new GSS acceptor context.
+     */
     public Optional<GSSContext> createContext ()
     {
         return withSubject("creating server context",

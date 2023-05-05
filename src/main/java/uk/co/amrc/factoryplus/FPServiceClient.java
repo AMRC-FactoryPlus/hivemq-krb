@@ -30,6 +30,9 @@ import io.reactivex.rxjava3.core.*;
 import uk.co.amrc.factoryplus.gss.*;
 import uk.co.amrc.factoryplus.http.*;
 
+/**
+ * Represents a client of the Factory+ services.
+ */
 public class FPServiceClient {
     private static final Logger log = LoggerFactory.getLogger(FPServiceClient.class);
 
@@ -48,15 +51,37 @@ public class FPServiceClient {
     private FPAuth _auth;
     private FPConfigDB _configdb;
 
+    /** Use configuration from the environment.
+     *
+     * This constructor will pull configuration entirely from the
+     * environment.
+     */
     public FPServiceClient () { 
         this(Map.<String,String>of());
     }
 
+    /** Override some or all of the configuration.
+     *
+     * This constructor will use the supplied configuration entries.
+     * Where an entry is not present, the environment will be used.
+     *
+     * @param config Configuration overrides.
+     */
     public FPServiceClient (Map config)
     {
         this.config = config;
     }
 
+    /** Gets a configuration parameter.
+     *
+     * If an override was supplied it will be returned. Otherwise the
+     * key will be uppercased and looked up in the process environment.
+     *
+     * @param key The config parameter.
+     * @return The config value.
+     * @throws ServiceConfigurationError If the config parameter is not
+     * supplied anywhere.
+     */
     public String getConf (String key)
     {
         return getOptionalConf(key)
@@ -64,6 +89,14 @@ public class FPServiceClient {
                 String.format("Config %s not found!", key)));
     }
 
+    /** Get an optional config parameter.
+     *
+     * Fetches a config parameter (as {@link #getConf(String)}) but does
+     * not throw if the parameter is unavailable.
+     *
+     * @param key The config parameter.
+     * @return An Optional of the value.
+     */
     public Optional<String> getOptionalConf (String key)
     {
         if (config.containsKey(key))
@@ -77,6 +110,15 @@ public class FPServiceClient {
         return Optional.of(val);
     }
 
+    /** Get a config parameter which is a URL.
+     *
+     * Fetches a (required) config parameter and parses it to a URI.
+     *
+     * @param env The config parameter.
+     * @return The URI value.
+     * @throws ServiceConfigurationError
+     *  If the parameter is absent or if an invalid URI is supplied.
+     */
     public URI getUriConf (String env)
     {
         String uri = getConf(env);
@@ -89,6 +131,14 @@ public class FPServiceClient {
         }
     }
 
+    /** Sets the Executor to use for async work.
+     *
+     * This will be used to create a Rx Scheduler.
+     *
+     * @param exec The Executor to use.
+     * @throws IllegalStateException
+     *  If {@link #getScheduler()} has already been called.
+     */
     synchronized public void setExecutor (Executor exec)
     {
         if (_scheduler != null)
@@ -98,6 +148,11 @@ public class FPServiceClient {
         _executor = exec;
     }
 
+    /** Fetches the Rx Scheduler to use.
+     *
+     * This will construct from a provided Executor or generate a
+     * default thread pool.
+     */
     synchronized public Scheduler getScheduler ()
     {
         if (_scheduler == null) {
@@ -115,6 +170,14 @@ public class FPServiceClient {
         return _gss;
     }
 
+    /** Fetches our server GSS credentials.
+     *
+     * This uses the <code>service_principal</code> and
+     * <code>server_keytab</code> config params to create a FPGssServer
+     * instance.
+     *
+     * @return Our server-side GSS credentials.
+     */
     synchronized public FPGssServer gssServer ()
     {
         if (_gss_server == null) {
@@ -130,6 +193,19 @@ public class FPServiceClient {
         return _gss_server;
     }
 
+    /** Fetches our client GSS credentials.
+     *
+     * If the <code>service_username</code> and
+     * <code>service_password</code> config entries are supplied, this
+     * will perform a new Kerberos login with those credentials.
+     * Otherwise this will assume a populated ccache is available and
+     * use that.
+     *
+     * Note that in both cases this requires a valid krb5 configuration
+     * and access to the KDC.
+     *
+     * @return Our client-side GSS credentials.
+     */
     synchronized public FPGssClient gssClient ()
     {
         if (_gss_client == null) {

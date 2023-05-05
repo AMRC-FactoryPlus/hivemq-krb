@@ -171,7 +171,30 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>render-javadoc</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>javadoc</goal>
+                        </goals>
+                        <configuration>
+                            <doclint>all,-missing</doclint>
+                            <links>
+                                <link>http://stleary.github.io/JSON-java/</link>
+                                <link>http://reactivex.io/RxJava/3.x/javadoc/</link>
+                                <link>https://hc.apache.org/httpcomponents-core-5.2.x/current/httpcore5/apidocs/</link>
+                                <link>https://hc.apache.org/httpcomponents-client-5.2.x/current/httpclient5/apidocs/</link>
+                            </links>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--plugin>
                 <groupId>org.asciidoctor</groupId>
                 <artifactId>asciidoctor-maven-plugin</artifactId>
                 <version>${asciidoctor.version}</version>

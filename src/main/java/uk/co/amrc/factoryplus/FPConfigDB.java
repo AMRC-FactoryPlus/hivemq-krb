@@ -3,10 +3,6 @@
  * Copyright 2023 AMRC.
  */
 
-/* This implementation is incomplete and does not map all endpoints.
- * Unmapped endpoints can be accessed through the generic http()
- * interface of FPServiceClient. */
-
 package uk.co.amrc.factoryplus;
 
 import java.net.*;
@@ -27,6 +23,13 @@ import io.reactivex.rxjava3.core.*;
 
 import uk.co.amrc.factoryplus.http.*;
 
+/**
+ * The Config Database.
+ *
+ * This implementation is incomplete and does not map all endpoints.
+ * Unmapped endpoints can be accessed through the generic http()
+ * interface of FPServiceClient.
+ */
 public class FPConfigDB {
     private static final Logger log = LoggerFactory.getLogger(FPConfigDB.class);
     private static final UUID SERVICE = FPUuid.Service.ConfigDB;
@@ -43,6 +46,15 @@ public class FPConfigDB {
         return fplus.http().request(SERVICE, method);
     }
 
+    /** Fetches a single config entry.
+     *
+     * This will presently only fetch config entries that are JSON
+     * objects.
+     *
+     * @param appid The Application UUID.
+     * @param objid The Object UUID.
+     * @return A JSONObject holding the config entry.
+     */
     public Single<JSONObject> getConfig (UUID appid, UUID objid)
     {
         return request("GET")

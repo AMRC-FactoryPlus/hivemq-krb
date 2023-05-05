@@ -28,6 +28,11 @@ import uk.co.amrc.factoryplus.http.*;
  * will be no network activity I would like to know that I got a 304 and
  * can reuse the existing derived value... */
 
+/** Service discovery.
+ *
+ * This service requires the <code>directory_url</code> configuration
+ * parameter to bootstrap the search process.
+ */
 public class FPDiscovery {
     private static final Logger log = LoggerFactory.getLogger(FPDiscovery.class);
 
@@ -43,16 +48,42 @@ public class FPDiscovery {
         setServiceURL(FPUuid.Service.Directory, url);
     }
 
+    /** Injects a service URL obtained out-of-band.
+     *
+     * This method should be used when you have some additional source
+     * of information about service location, for example explicit
+     * configuration. URLs set with this method will override any
+     * responses from the Directory.
+     *
+     * @param service The Service UUID.
+     * @param url The service URL.
+     */
     public void setServiceURL (UUID service, URI url)
     {
         cache.put(service, Set.of(url));
     }
 
+    /** Fetches the URLs available for a service.
+     *
+     * This will respect URLs set with {@link #setServiceURL(UUID,URI)};
+     * otherwise it will look up in the Directory.
+     *
+     * @param service The Service UUID.
+     * @return A Set of the URIs registered.
+     */
     public Single<Set<URI>> lookup (UUID service)
     {
         return cache.get(service);
     }
 
+    /** Gets the most suitable URL to use for a service.
+     *
+     * Currently this simply takes one from the returned set. Selection
+     * of URLs is not specified yet.
+     *
+     * @param service The Service UUID.
+     * @return The URI to use.
+     */
     public Single<URI> get (UUID service)
     {
         return lookup(service)
@@ -64,6 +95,10 @@ public class FPDiscovery {
             //.doOnSuccess(base -> log.info("Resolved {} to {}", service, base));
     }
 
+    /** Indicate a URL is not working.
+     *
+     * Not implemented.
+     */
     public void remove (UUID service, URI bad)
     {
         /* Ignore for now. */

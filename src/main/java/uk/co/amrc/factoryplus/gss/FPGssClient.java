@@ -26,11 +26,14 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
+/** GSS client credentials.
+ */
 public class FPGssClient extends FPGssPrincipal {
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
 
     private GSSCredential creds;
 
+    /** Internal, construct via {@link FPGssProvider}. */
     public FPGssClient (FPGssProvider provider, Subject subject)
     {
         super(provider, subject);
@@ -47,6 +50,13 @@ public class FPGssClient extends FPGssPrincipal {
         }
     }
 
+    /** Fetches credentials.
+     *
+     * This performs a Kerberos login, if necessary, and verifies we can
+     * access a usable ccache.
+     *
+     * @return This, iff we are successful in getting creds.
+     */
     public Optional<FPGssClient> login ()
     {
         return withSubject("getting client credentials", () -> {
@@ -63,11 +73,27 @@ public class FPGssClient extends FPGssPrincipal {
         });
     }
 
+    /** Creates a GSS initiator context.
+     *
+     * The server name is provided as a Kerberos principal name.
+     *
+     * @param server The server we are communicating with.
+     * @return A GSS context.
+     */
     public Optional<GSSContext> createContext (String server)
     {
         return _createContext(server, provider.krb5PrincipalNT());
     }
 
+    /** Creates a GSS initiator context.
+     *
+     * The server name is a hostbased-service GSS string, i.e. in the
+     * form <code>service@host</code>. The realm will be resolved via
+     * the Kerberos configuration.
+     *
+     * @param service The server we are communicating with.
+     * @return A GSS context.
+     */
     public Optional<GSSContext> createContextHB (String service)
     {
         return _createContext(service, GSSName.NT_HOSTBASED_SERVICE);
