@@ -33,7 +33,7 @@ import io.reactivex.rxjava3.disposables.Disposable;
 public abstract class FPGssPrincipal
     implements Disposable
 {
-    private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
+    private static final Logger log = LoggerFactory.getLogger(FPGssPrincipal.class);
 
     protected final FPGssProvider provider;
 
@@ -123,7 +123,7 @@ public abstract class FPGssPrincipal
     synchronized protected void setCreds (GSSCredential creds)
     {
         throwIfDisposed();
-        if (creds != null)
+        if (this.creds != null)
             throw new IllegalStateException("Can't overwrite GSS creds");
         this.creds = creds;
     }

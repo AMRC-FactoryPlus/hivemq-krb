@@ -39,13 +39,41 @@ public class FPKrbAuth implements EnhancedAuthenticator {
 
     private FPKrbAuthProvider provider;
 
+    static class GssResult {
+        public final byte[] token;
+        public final String client;
+
+        private GssResult (byte[] token, String client)
+        {
+            this.token = token;
+            this.client = client;
+        }
+
+        public static GssResult accept (GSSContext ctx, byte[] in_buf)
+            throws Exception
+        {
+            /* It would be helpful to log the client and server
+             * identities if this call fails, so we can see who was
+             * trying to connect and what endpoint they were trying to
+             * connect to. But get{Src,Targ}Name can't be called until
+             * the context is established, so we can't. Grrr. */
+            var token = ctx.acceptSecContext(in_buf, 0, in_buf.length);
+            if (!ctx.isEstablished())
+                throw new Exception("GSS login took more than one step!");
+
+            var client = ctx.getSrcName().toString();
+
+            return new GssResult(token, client);
+        }
+    }
+
     static class AuthResult {
-        public byte[] gssToken;
+        public GssResult gss;
         public List<TopicPermission> acl;
 
-        public AuthResult (byte[] tok, List<TopicPermission> acl)
+        public AuthResult (GssResult gss, List<TopicPermission> acl)
         {
-            this.gssToken = tok;
+            this.gss = gss;
             this.acl = acl;
         }
 
@@ -116,11 +144,12 @@ public class FPKrbAuth implements EnhancedAuthenticator {
             Duration.ofSeconds(10), TimeoutFallback.FAILURE);
 
         verify_gssapi(in_buf)
+            .subscribeOn(provider.getScheduler())
             .doAfterTerminate(() -> asyncOutput.resume())
             .subscribe(
                 rv -> {
                     rv.applyACL(output);
-                    output.authenticateSuccessfully(rv.gssToken);
+                    output.authenticateSuccessfully(rv.gss.token);
                 },
                 e -> {
                     log.error("GSSAPI auth failed", e);
@@ -147,75 +176,33 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         final Async<EnhancedAuthOutput> asyncOutput = output.async(
             Duration.ofSeconds(10), TimeoutFallback.FAILURE);
 
-        Services.extensionExecutorService().submit(() -> {
-            /* We need to get and verify a service ticket, to protect
-             * against a spoofed KDC. The only striaghtforward way to do
-             * this is just to do the whole GSSAPI dance on the client's
-             * behalf. */
-            var buf = get_client_gss_proxy(user, passwd_buf);
-            if (buf.isEmpty()) {
-                log.error("Password authentication failed for {}", 
-                    user.toString());
-                output.failAuthentication();
-                asyncOutput.resume();
-                return;
-            }
-            verify_gssapi(buf.get())
-                .doAfterTerminate(() -> asyncOutput.resume())
-                .subscribe(
-                    rv -> {
-                        rv.applyACL(output);
-                        output.authenticateSuccessfully();
-                    },
-                    e -> output.failAuthentication());
-        });
-    }
-
-    private Optional<byte[]> get_client_gss_proxy (
-        String user, char[] passwd_buf)
-    {
-        return provider.createProxyContext(user, passwd_buf)
-            .flatMap(ctx -> {
-                try {
-                    return Optional.of(ctx.initSecContext(new byte[0], 0, 0));
-                }
-                catch (GSSException e) {
-                    log.error("GSS error for client proxy", e.toString());
-                    return Optional.<byte[]>empty();
-                }
-            });
+        provider.proxyForClient(user, passwd_buf)
+            .subscribeOn(provider.getScheduler())
+            .flatMap(buf -> verify_gssapi(buf))
+            .doFinally(() -> asyncOutput.resume())
+            .subscribe(
+                rv -> {
+                    rv.applyACL(output);
+                    output.authenticateSuccessfully();
+                },
+                e ->  {
+                    log.error("Password authentication failed for {}: {}",
+                        user, e.toString());
+                    output.failAuthentication();
+                });
     }
 
     private Single<AuthResult> verify_gssapi (byte[] in_buf)
     {
-        GSSContext ctx = provider.createServerContext();
-
-        try {
-            /* It would be helpful to log the client and server
-             * identities if this call fails, so we can see who was
-             * trying to connect and what endpoint they were trying to
-             * connect to. But get{Src,Targ}Name can't be called until
-             * the context is established, so we can't. Grrr. */
-            byte[] out_buf = ctx.acceptSecContext(in_buf, 0, in_buf.length);
-
-            if (ctx.isEstablished()) {
-                String client_name = ctx.getSrcName().toString();
-                log.info("Authenticated client {}", client_name);
-                return provider.getACLforPrincipal(client_name)
-                    .map(acl -> new AuthResult(out_buf, acl))
-                    .doOnSuccess(rv -> log.info("MQTT ACL [{}]: {}", 
-                        client_name, rv.showACL()));
-            }
-            else {
-                /* We could handle this case, but I don't think with the
-                 * Kerberos mech there is ever any need. */
-                return Single.<AuthResult>error(
-                    new Exception("GSS login took more than one step!"));
-            }
-        }
-        catch (GSSException e) {
-            return Single.<AuthResult>error(
-                new Exception("GSS login failed", e));
-        }
+            /* blocking */
+        return Single.using(
+                () -> provider.createServerContext(),
+                ctx -> Single.just(GssResult.accept(ctx, in_buf)),
+                ctx -> ctx.dispose())
+            .doOnSuccess(gsr -> log.info("Authenticated client {}", gsr.client))
+            .flatMap(gsr -> provider.getACLforPrincipal(gsr.client)
+                .map(acl -> new AuthResult(gsr, acl)))
+            .doOnSuccess(rv -> log.info("MQTT ACL [{}]: {}", 
+                rv.gss.client, rv.showACL()));
     }
 }

@@ -19,6 +19,7 @@ import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
 import org.apache.hc.core5.http.ProtocolException;
 
 import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.functions.Function;
 
 import uk.co.amrc.factoryplus.*;
 
@@ -86,8 +87,15 @@ class TokenRequest
             return mkerr("Cannot establish server's identity");
 
         //log.info("Accepted GSS response from {}", ctx.getTargName());
-        ctx.dispose();
 
         return Single.just(res);
+    }
+
+    public Single<JsonResponse> executeWith (
+        Function<SimpleHttpRequest, Single<JsonResponse>> fetch
+    ) {
+        return Single.fromCallable(this::buildRequest)
+            .flatMap(fetch)
+            .flatMap(this::handleResponse);
     }
 }

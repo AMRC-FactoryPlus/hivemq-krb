@@ -87,6 +87,8 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
         return new FPKrbAuth(this);
     }
 
+    public Scheduler getScheduler () { return fplus.getScheduler(); }
+
     public GSSContext createServerContext ()
     {
         return fplus.gssServer()
@@ -95,13 +97,37 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
                 "Cannot create server GSS context"));
     }
 
-    public Optional<GSSContext> createProxyContext (String user, char[] passwd)
+    public Single<byte[]> proxyForClient (String user, char[] passwd)
     {
-        String srv = fplus.gssServer().getPrincipal();
-        return fplus.gss()
-            .clientWithPassword(user, passwd)
-            .flatMap(cli -> cli.login())
-            .flatMap(cli -> cli.createContext(srv));
+        /* This whole call is synchronous and blocking. I don't think
+         * there's much point trying to avoid this: the blocking calls
+         * are all GSSAPI, which is always synchronous. */
+        /* I'm not convinced the Optional<> returns are helping any
+         * more. Probably they should be changed to Single<>, or just
+         * left throwing. */
+        return Single.fromCallable(() -> {
+            var cli = fplus.gss().clientWithPassword(user, passwd)
+                .orElseThrow(() -> new Exception(
+                    "Password login failed for " + user));
+            try {
+                cli.login();
+
+                String srv = fplus.gssServer().getPrincipal();
+                var ctx = cli.createContext(srv)
+                    .orElseThrow(() -> new Exception(
+                        "Cannot create proxy GSS context"));
+
+                try {
+                    return ctx.initSecContext(new byte[0], 0, 0);
+                }
+                finally {
+                    ctx.dispose();
+                }
+            }
+            finally {
+                cli.dispose();
+            }
+        });
     }
 
     public Single<List<TopicPermission>> getACLforPrincipal (String principal)
