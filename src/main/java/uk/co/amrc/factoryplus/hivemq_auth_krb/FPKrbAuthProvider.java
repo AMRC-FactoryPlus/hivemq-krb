@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.UUID;
-import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
@@ -67,6 +67,13 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
 
         fplus.directory()
             .registerServiceURL(FPUuid.Service.MQTT, url)
+            .retryWhen(errs -> errs
+                .doOnNext(e -> {
+                    log.error("Service registration failed: {}", e.toString());
+                    log.info("Retrying registration in 5 seconds.");
+                })
+                .delay(5, TimeUnit.SECONDS))
+            .timeout(10, TimeUnit.MINUTES)
             .subscribe(() -> log.info("Registered service successfully"),
                 e -> log.error("Failed to register service: {}", 
                     e.toString()));
