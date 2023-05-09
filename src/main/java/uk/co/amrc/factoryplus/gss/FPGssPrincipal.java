@@ -26,13 +26,19 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
+import io.reactivex.rxjava3.disposables.Disposable;
+
 /** A GSS principal (client or server).
  */
-public abstract class FPGssPrincipal {
+public abstract class FPGssPrincipal
+    implements Disposable
+{
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
 
-    FPGssProvider provider;
-    Subject subject;
+    protected final FPGssProvider provider;
+
+    private Subject subject;
+    private GSSCredential creds;
 
     /** Internal, construct via {@link FPGssProvider}. */
     public FPGssPrincipal (FPGssProvider provider, Subject subject)
@@ -41,11 +47,39 @@ public abstract class FPGssPrincipal {
         this.subject = subject;
     }
 
+    synchronized public boolean isDisposed ()
+    {
+        return subject == null;
+    }
+
+    synchronized public void dispose ()
+    {
+        if (isDisposed()) return;
+        subject = null;
+        if (creds != null) {
+            try {
+                creds.dispose();
+            }
+            catch (GSSException e) {
+                log.error("Error disposing of GSS credentials: {}",
+                    e.toString());
+            }
+        }
+    }
+
     /** Gets our Kerberos principal name.
      *
      * @return Our Kerberos principal name.
      */
     public abstract String getPrincipal ();
+
+    /** Obtain our Kerberos credentials.
+     *
+     * This operation may block on network calls.
+     *
+     * @return This, iff successful.
+     */
+    public abstract <T extends FPGssProvider> Optional<T> login ();
 
     /** Performs an operation using our Subject.
      *
@@ -62,6 +96,7 @@ public abstract class FPGssPrincipal {
     public <T> Optional<T> withSubject (String msg, 
         PrivilegedExceptionAction<T> action)
     {
+        throwIfDisposed();
         try {
             return Optional.of(Subject.doAs(subject, action));
         }
@@ -69,5 +104,27 @@ public abstract class FPGssPrincipal {
             log.error(msg, e.toString());
             return Optional.<T>empty();
         }
+    }
+
+    protected void throwIfDisposed ()
+    {
+        if (isDisposed())
+            throw new IllegalStateException("Object has been disposed");
+    }
+
+    synchronized protected GSSCredential getCreds ()
+    {
+        throwIfDisposed();
+        if (creds == null)
+            throw new IllegalStateException("No GSS credentials available");
+        return creds;
+    }
+
+    synchronized protected void setCreds (GSSCredential creds)
+    {
+        throwIfDisposed();
+        if (creds != null)
+            throw new IllegalStateException("Can't overwrite GSS creds");
+        this.creds = creds;
     }
 }

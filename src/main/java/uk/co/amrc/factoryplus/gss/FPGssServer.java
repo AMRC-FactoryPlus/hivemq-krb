@@ -26,11 +26,11 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
-public class FPGssServer extends FPGssPrincipal {
+public class FPGssServer extends FPGssPrincipal
+{
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
 
     String principal;
-    private GSSCredential creds;
 
     /** Internal; construct via {@link FPGssProvider}. */
     public FPGssServer (FPGssProvider provider, String principal, Subject subject)
@@ -49,8 +49,9 @@ public class FPGssServer extends FPGssPrincipal {
      */
     public Optional<FPGssServer> login ()
     {
+        throwIfDisposed();
         return withSubject("getting creds from keytab", () -> {
-            creds = provider.getGSSManager()
+            var creds = provider.getGSSManager()
                 .createCredential(GSSCredential.ACCEPT_ONLY);
 
             log.info("Got GSS creds for server:");
@@ -59,6 +60,7 @@ public class FPGssServer extends FPGssPrincipal {
                     mech, creds.getName(mech));
             }
 
+            setCreds(creds);
             return this;
         });
     }
@@ -70,6 +72,7 @@ public class FPGssServer extends FPGssPrincipal {
     public Optional<GSSContext> createContext ()
     {
         return withSubject("creating server context",
-                () -> provider.getGSSManager().createContext(creds));
+                () -> provider.getGSSManager()
+                    .createContext(getCreds()));
     }
 }

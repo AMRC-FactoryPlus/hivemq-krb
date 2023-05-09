@@ -28,10 +28,9 @@ import org.json.*;
 
 /** GSS client credentials.
  */
-public class FPGssClient extends FPGssPrincipal {
+public class FPGssClient extends FPGssPrincipal
+{
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
-
-    private GSSCredential creds;
 
     /** Internal, construct via {@link FPGssProvider}. */
     public FPGssClient (FPGssProvider provider, Subject subject)
@@ -42,7 +41,7 @@ public class FPGssClient extends FPGssPrincipal {
     public String getPrincipal ()
     {
         try {
-            return creds.getName(provider.krb5Mech()).toString();
+            return getCreds().getName(provider.krb5Mech()).toString();
         }
         catch (GSSException e) {
             throw new ServiceConfigurationError(
@@ -59,8 +58,9 @@ public class FPGssClient extends FPGssPrincipal {
      */
     public Optional<FPGssClient> login ()
     {
+        throwIfDisposed();
         return withSubject("getting client credentials", () -> {
-            creds = provider.getGSSManager()
+            var creds = provider.getGSSManager()
                 .createCredential(GSSCredential.INITIATE_ONLY);
 
             log.info("Got GSS creds for client:");
@@ -69,6 +69,7 @@ public class FPGssClient extends FPGssPrincipal {
                     mech, creds.getName(mech));
             }
 
+            setCreds(creds);
             return this;
         });
     }
@@ -101,12 +102,13 @@ public class FPGssClient extends FPGssPrincipal {
 
     private Optional<GSSContext> _createContext (String name, Oid type)
     {
+        throwIfDisposed();
         return withSubject("creating client context", () -> {
             Oid mech = provider.krb5Mech();
             GSSManager mgr = provider.getGSSManager();
             GSSName srv_nam = mgr.createName(name, type, mech);
             return mgr.createContext(
-                srv_nam, mech, creds, GSSContext.DEFAULT_LIFETIME);
+                srv_nam, mech, getCreds(), GSSContext.DEFAULT_LIFETIME);
         });
     }
 }
