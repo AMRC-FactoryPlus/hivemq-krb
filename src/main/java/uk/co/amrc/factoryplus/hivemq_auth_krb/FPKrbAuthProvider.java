@@ -132,28 +132,36 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
 
     public Single<List<TopicPermission>> getACLforPrincipal (String principal)
     {
-        class TemplateUse {
-            public Map<String, Object> template;
-            public UUID target;
-
-            public TemplateUse (JSONObject tmpl, String targ)
-            {
-                this.template = tmpl.toMap();
-                this.target = UUID.fromString(targ);
-            }
-        }
+        /* This will not send a request until someone subscribes. */
+        var princUUID = fplus.auth()
+            .getPrincipalByKerberos(principal);
 
         return fplus.auth().getACL(principal, PERMGRP_UUID)
             .flatMapObservable(Observable::fromStream)
-            .flatMapSingle(ace -> {
-                String perm = (String)ace.get("permission");
-                String targid = (String)ace.get("target");
+            .flatMap(ace -> fplus.configdb()
+                .getConfig(TEMPLATE_UUID, ace.permission)
+                .flattenStreamAsObservable(tmpl ->
+                    tmpl.toMap().entrySet().stream())
+                .map(e -> MqttAce.fromEntry(e, ace.target)))
+            .collect(Collectors.toList())
+            .flatMapObservable(acl -> {
+                var wantPrinc = acl.stream()
+                    .anyMatch(ace -> ace.uses(MqttAce.WANT_PRINC));
 
-                return fplus.configdb()
-                    .getConfig(TEMPLATE_UUID, UUID.fromString(perm))
-                    .map(tmpl -> new TemplateUse(tmpl, targid));
-            })
+                var uuids = Observable.fromStream(acl.stream())
+                    .filter(ace -> ace.uses(MqttAce.WANT_TARG))
+                    .map(ace -> ace.getTarget())
+                    .mergeWith(wantPrinc
+                        ? fplus.auth()
+                            .getPrincipalByKerberos(principal)
+                        : Maybe.<UUID>empty())
+                    .distinct();
+
             .flatMapStream(ace -> {
+                final var entries = ace.template.entrySet();
+                final int want = entries.stream()
+                    .map(
+                
                 Single<JSONObject> target = fplus.configdb()
                     .getConfig(ADDR_UUID, ace.target);
                 return ace.template.entrySet().stream()

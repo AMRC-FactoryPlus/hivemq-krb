@@ -37,6 +37,27 @@ public class FPAuth {
 
     private FPServiceClient fplus;
 
+    class ACE {
+        public final UUID permission;
+        public final UUID target;
+
+        public ACE (UUID p, UUID t)
+        {
+            permission = p;
+            target = t;
+        }
+
+        public static ACE fromMap (Map<String, Object> map)
+            throws Exception
+        {
+            String perm = (String)ace.get("permission");
+            String target = (String)ace.get("target");
+            
+            return new ACE(UUID.fromString(perm),
+                UUID.fromString(target));
+        }
+    }
+
     public FPAuth (FPServiceClient fplus)
     {
         this.fplus = fplus;
@@ -56,7 +77,7 @@ public class FPAuth {
      * @param perms The permission group to fetch.
      * @return A stream of maps represnting the granted permissions.
      */
-    public Single<Stream<Map>> getACL (String princ, UUID perms)
+    public Single<Stream<ACE>> getACL (String princ, UUID perms)
     {
         //FPThreadUtil.logId("fetching acl");
         return fplus.http().request(SERVICE, "GET")
@@ -74,6 +95,23 @@ public class FPAuth {
             .doOnSuccess(acl -> log.info("F+ ACL [{}]: {}", princ, acl))
             .map(acl -> acl.toList().stream()
                 .filter(o -> o instanceof Map)
-                .map(o -> (Map)o));
+                .map(o -> ACE.fromMap((Map)o)));
     }
+
+    /**
+     * Finds a principal UUID from their Kerberos UPN.
+     *
+     * The requesting client needs Read_Krb permission on the principal.
+     *
+     * @param kerberos The Kerberos UPN to look up.
+     * @return The UUID of the principal.
+     */
+    public Maybe<UUID> getPrincipalByKerberos (String kerberos)
+    {
+        return fplus.http().request(SERVICE, "GET")
+            .withURIBuilder(b -> b
+                .appendPath("authz/principal/find")
+                .setParameter("kerberos", kerberos))
+            .fetch()
+            .flatMapOptional(res -> res.ifOk());
 }
